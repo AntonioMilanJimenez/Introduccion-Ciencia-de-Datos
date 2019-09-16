@@ -1,0 +1,2634 @@
+---
+title: "Introducción a la Ciencia de Datos"
+subtitle: "Trabajo Final Teórico/Práctico"
+author: "Antonio Manuel Milán Jiménez"
+date: "4 de Enero de 2019"
+output: pdf_document
+toc: true
+number_sections: true
+---
+
+\newpage
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Análisis de Datos
+
+Vamos a empezar cargando los dos 'datasets'.
+
+```{r}
+#Carga de los 'datasets'
+library(ggplot2)
+heart <- read.csv("./heart/heart.dat", comment.char = "@", header = FALSE)
+
+names(heart) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral", 
+"FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+"Slope", "MajorVessels", "Thal", "Class")
+
+deltaAil <- read.csv("./delta_ail/delta_ail.dat",comment.char = "@", header = FALSE)
+
+names(deltaAil) <- c("RollRate", "PitchRate", "currPitch", "currRoll", "diffRollRate", "Sa")
+```
+
+##Análisis del Dataset 'heart'
+
+En este 'dataset' se trata de poder predecir una enfermedad en el corazón a partir de otros factores tales como la edad, el sexo, colesterol, etc. Por lo tanto se trata de un problema de clasificación.
+
+```{r}
+#Dimensiones del dataset heart
+dim(heart)
+```
+
+A partir de las dimensiones del 'dataset' descubrimos que tenemos un total de 13 factores para hacer la predicción (la última variable es la predicción en sí). También sabemos que tenemos un total de 270 observaciones.
+
+\ 
+
+Estos son los nombres de las variables:
+
+```{r}
+#Nombre de las variables
+colnames(heart)
+```
+
+\ 
+
+Y aquí el tipo de dato atómico de cada una de ellas:
+
+```{r}
+#Tipo atómico de cada variable
+unlist(lapply(heart,class))
+```
+
+Descubrimos que todas son de tipo 'entero' excepto la variable 'Oldpeak' que es 'real'.
+
+\ 
+
+```{r}
+#Estructura del dataset
+class(heart)
+unique(heart$Class)
+```
+
+Además, sabemos que el dataset es un dataframe y que variable a predecir es binaria, 1 y 2; indicando un 1 que hay enfermedad y un 2 indicando que no la hay. Para hacer más comprensible esta variable de salida, la reconvertimos a un "factor" con los valores apropiados:
+
+```{r}
+#Conversión de la variable de salida a un factor
+heart$Class <- factor(heart$Class, levels = c(1, 2), labels = c("Si", "No"))
+```
+
+
+###Eliminación de 'missing values' y observaciones repetidas
+
+Antes de empezar a trabajar con los datos, debemos tratar los 'missing values' de nuestro conjunto de datos pues será necesarios para según qué cálculos. 
+
+```{r}
+#Comprobación de missing values
+which(is.na(heart) == TRUE)
+```
+
+Sin embargo, descubrimos que no hay ningún 'missing value' en los datos por lo que no será necesario preocuparnos por ello.
+
+\ 
+
+Otro caso que podría suceder en el conjunto de datos es que haya observaciones repetidas que deberán ser eliminadas.
+
+```{r}
+#Comprobación de valores duplicados
+which(duplicated(heart) == TRUE)
+```
+
+
+Observamos que tampoco hay observaciones repetidas en el 'dataset' así que no tenemos que eliminar ninguna.
+
+
+###Datos de salida equilibrados
+
+Otro punto a tener en cuenta es que estén los datos equilibrados respecto a la variable a predecir, es decir, que haya un número de observaciones parecidas para una clase y para otra.
+
+```{r}
+#Proporción de la variable de salida
+round(prop.table(table(heart$Class)) * 100, digits = 1)
+```
+
+Tenemos una proporción de 55.6% frente a 44.4% en la variable de salida por lo que hay un cierto equilibrio en las observaciones. Si quisiesmos que estuviesen más balanceados podríamos simplemente eliminar observaciones de la clase "Si".
+
+###Medidas de distribución sobre el conjunto de datos
+
+
+A continuación estudiamos la distribución de los datos para las diferentes variables del conjunto de datos. Con esto aprenderemos más de los datos y podremos tratar los datos en el caso de que no estén bien distribuidos.
+
+Empezamos por las variables categóricas, estudiando si están bien distribuidas.
+
+```{r}
+#Proporción de las variables discretas predictoras
+round(prop.table(table(heart$Sex)) * 100, digits = 1)
+round(prop.table(table(heart$ChestPainType)) * 100, digits = 1)
+round(prop.table(table(heart$FastingBloodSugar)) * 100, digits = 1)
+round(prop.table(table(heart$ResElectrocardiographic)) * 100, digits = 1)
+round(prop.table(table(heart$ExerciseInduced)) * 100, digits = 1)
+round(prop.table(table(heart$Slope)) * 100, digits = 1)
+round(prop.table(table(heart$MajorVessels)) * 100, digits = 1)
+round(prop.table(table(heart$Thal)) * 100, digits = 1)
+```
+
+
+Vemos que no están bien balanceadas las clases lo cuál podría influir negativamente para futuras predicciones en las que no se tengan suficientes datos de entrenamiento para las clases más escasas.
+
+\ 
+ 
+Estudiando ahora las variables continuas, empezamos con la variable de "Edad":
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable Age
+ggplot(heart, aes(x=Age)) + geom_histogram(binwidth = 5,color="black",fill="lightblue")+labs(
+  title="Distribucion de Age")
+```
+
+
+Observamos una distribución normal por lo que podemos decir que los datos para la variable "Edad" están muy bien distribuidos.
+
+\ 
+
+Siguiendo con las distribuciones del resto de variables continuas:
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable RestBloodPressure
+ggplot(heart, aes(x=RestBloodPressure))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(RestBloodPressure)),color="green")+labs(title="Distribucion de RestBloodPressure")+geom_text(aes(x=136,y=0.01),label="mean",color="green")+geom_vline(aes(xintercept=median(RestBloodPressure)),color="red")+geom_text(aes(x=124,y=0.01),label="median",color="red")+geom_text(aes(x=180,y=0.02),label=paste("mean: ",toString(round(mean(heart$RestBloodPressure),2))),color="green") +geom_text(aes(x=179,y=0.018),label=paste("median: ",toString(median(heart$RestBloodPressure))),color="red") + geom_text(aes(x=179,y=0.016),label=paste("std: ",toString(round(sd(heart$RestBloodPressure),2))),color="blue")
+```
+
+Se presenta una distribución aceptable, una distribución normal con cola a la derecha.
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable SerumCholestoral
+ggplot(heart, aes(x=SerumCholestoral))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(SerumCholestoral)),color="green")+labs(title="Distribucion de SerumCholestoral")+geom_text(aes(x=272,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(SerumCholestoral)),color="red")+geom_text(aes(x=224,y=0.004),label="median",color="red")+geom_text(aes(x=400,y=0.007),label=paste("mean: ",toString(round(mean(heart$SerumCholestoral),2))),color="green") +geom_text(aes(x=400,y=0.0065),label=paste("median: ",toString(median(heart$SerumCholestoral))),color="red") + geom_text(aes(x=400,y=0.006),label=paste("std: ",toString(round(sd(heart$SerumCholestoral),2))),color="blue")
+```
+
+Se presenta una buena distribución normal con un elemento en el extremo derecho que seguramente se tratará de un 'outlier'. Sin embargo, dado que ese dato puede ser un valor 'natural', es decir, no que haya sido un error de medición, se decide mantenerlo en el conjunto de datos.
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable MaxHeartRate
+ggplot(heart, aes(x=MaxHeartRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(MaxHeartRate)),color="green")+labs(title="Distribucion de MaxHeartRate")+geom_text(aes(x=140,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(MaxHeartRate)),color="red")+geom_text(aes(x=160,y=0.004),label="median",color="red")+geom_text(aes(x=190,y=0.014),label=paste("mean: ",toString(round(mean(heart$MaxHeartRate),2))),color="green") +geom_text(aes(x=190,y=0.012),label=paste("median: ",toString(median(heart$MaxHeartRate))),color="red") + geom_text(aes(x=190,y=0.01),label=paste("std: ",toString(round(sd(heart$MaxHeartRate),2))),color="blue")
+```
+
+Para esta variable se tiene una distribución más pobre, con una ligera cola a la izquierda.
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable Oldpeak
+ggplot(heart, aes(x=Oldpeak))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(Oldpeak)),color="green")+labs(title="Distribucion de Oldpeak")+geom_text(aes(x=12,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(Oldpeak)),color="red")+geom_text(aes(x=2,y=0.004),label="median",color="red")+geom_text(aes(x=40,y=0.044),label=paste("mean: ",toString(round(mean(heart$Oldpeak),2))),color="green") +geom_text(aes(x=40,y=0.04),label=paste("median: ",toString(median(heart$Oldpeak))),color="red") + geom_text(aes(x=40,y=0.036),label=paste("std: ",toString(round(sd(heart$Oldpeak),2))),color="blue")
+```
+
+Por último, esta variable posee la peor distribución de todas, muy alejada de una distribución normal.
+
+
+###Normalización
+
+Observando que no todas las distribuciones de las variables son todo lo buenas que quisiésemos vamos a normalizar estas variables continuas, creando un nuevo 'dataset' modificado, buscando si se comporta mejor los modelos que construyamos con éstas.
+
+```{r}
+#Normalización del dataset
+heartNormalizado <- data.frame(heart)
+heartNormalizado$RestBloodPressure <- scale(heartNormalizado$RestBloodPressure)
+heartNormalizado$SerumCholestoral <- scale(heartNormalizado$SerumCholestoral)
+heartNormalizado$MaxHeartRate <- scale(heartNormalizado$MaxHeartRate)
+heartNormalizado$Oldpeak <- scale(heartNormalizado$Oldpeak)
+```
+
+Así conseguimos que la desviación típica para estas variables continuas sea de 1.
+
+###Análisis de correlaciones
+
+Por último vamos a estudiar las correlaciones que existen entre las diferentes variables del dataset a excepción de la variable de salida. Esto se realiza para buscar si hay alguna variable muy correlacionada con otra y que pueda ser redundante, pudiendo así prescindir de ella. 
+ 
+```{r}
+#Maxima correlacion entre las variables predictoras
+max(abs(cor(heart[-14]))%%1)
+```
+ 
+Sin embargo, descubrimos que la mayor correlación entre alguna de las variables, claramente que no sean las mismas entre ellas, es tan sólo de 0.52 por lo que no hay redundancia en este aspecto y no se prescinde de ninguna a priori.
+
+##Análisis del Dataset 'delta_ail'
+
+Este 'dataset' está relacionado con el control de los alerones de los aviones. Así, a partir de otras variables se trata de estimar una variación sobre dichos alerones, siendo así un problema de regresión.
+
+```{r}
+#Dimensiones del dataset delta_Ail
+dim(deltaAil)
+```
+
+Se observa que tenemos un total de 7129 observaciones con 5 factores y una variable a predecir, 'Sa'.
+
+\ 
+
+Estos son los nombres de las variables:
+
+```{r}
+#Nombre de las variables del dataset
+colnames(deltaAil)
+```
+
+\ 
+
+Y aquí el tipo de dato atómico de cada una de ellas:
+
+```{r}
+#Tipo atomico de cada variable
+unlist(lapply(deltaAil,class))
+```
+
+En esta ocasión todas las variables son 'reales'.
+
+\ 
+ 
+```{r}
+#Estructura del dataset y de la variable de salida
+class(deltaAil)
+min(deltaAil$Sa)
+max(deltaAil$Sa)
+```
+
+Nuevamente, la estructura del 'dataset' es de un dataframe. Dado que este 'dataset' es utilizado como un problema de regresión, la variable de salida es ahora continua, desde -0.0021 hasta 0.0022.
+
+\ 
+
+Buscando una primera idea sobre las variables predictoras respecto a la variable de salida:
+
+```{r}
+#Correlación respecto a la variable de salida
+cor(deltaAil)[6,]
+```
+
+En esta ocasión observamos que la variable 'RollRate' tiene una correlación, aunque negativa, del 77% por lo que será bastante interesante empezar a trabajar por esta variable. Estudiando el resto de las correlaciones, la variable 'diffRollRate' se sitúa en el 56% y el resto tienen unas correlaciones muy bajas por lo que, en principio, las variables 'RollRate' y 'diffRollRate' serán el 'eje central' de los modelos que se construyan.
+
+
+###Eliminación de 'missing values' y observaciones repetidas
+
+Nuevamente comprobaremos si hay algún 'missing value' en nuestro dataset que debiese ser tratado:
+
+```{r}
+#Comprobación de missing values
+which(is.na(deltaAil) == TRUE)
+```
+
+Sin embargo, no hay ningún dato perdido en el conjunto de datos. Al igual que para el dataset anterior, es importante también comprobar si hay alguna observación repetida:
+
+```{r}
+#Comprobación de valores duplicados
+which(duplicated(deltaAil) == TRUE)
+```
+
+No tenemos que eliminar ninguna pues todas las observaciones son únicas.
+
+###Datos de salida equilibrados
+
+Dado que ahora se está trabajando con un problema de regresión, lo ideal sería que, respecto a la variable de salida, los datos siguiesen una distribución normal.
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable de salida Sa
+ggplot(deltaAil, aes(x=Sa))+geom_density(color="darkblue",fill="lightblue")+labs(title="Distribucion de la variable de salida Sa")
+```
+
+
+Esta distribución se corresponde con una distribución bimodal, teniendo dos "modas" en ambos máximos de la gráfica. Además, ambas modas se corresponden con que se haga una modificación positiva o negativa en los alerones, por lo que podemos decir que están bastante bien diferenciados los datos respecto al tipo de modificación, aunque al ser un problema de regresión, nuestro objetivo es saber cuánta modificación se debe hacer.
+
+
+###Medidas de distribución sobre el conjunto de datos
+
+Dado que todas las variables de este conjunto de datos son continuas, procedemos a estudiar las distribuciones de cada una de ellas:
+
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable RollRate
+ggplot(deltaAil, aes(x=RollRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(RollRate)),color="green")+labs(title="Distribucion de RollRate")+geom_text(aes(x=-0.001,y=15),label="mean",color="green")+geom_vline(aes(xintercept=median(RollRate)),color="red")+geom_text(aes(x=0.004,y=15),label="median",color="red")+geom_text(aes(x=0.012,y=60),label=paste("mean: ",toString(round(mean(deltaAil$RollRate),5))),color="green") +geom_text(aes(x=0.012,y=55),label=paste("median: ",toString(median(deltaAil$RollRate))),color="red") + geom_text(aes(x=0.012,y=50),label=paste("std: ",toString(round(sd(deltaAil$RollRate),5))),color="blue")
+```
+
+Nuevamente nos encontramos con una distribución bimodal, bastante diferenciada en si el valor es negativo o positivo.
+
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable PitchRate
+ggplot(deltaAil, aes(x=PitchRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(PitchRate)),color="green")+labs(title="Distribucion de PitchRate")+geom_text(aes(x=0.0015,y=50),label="mean",color="green")+geom_vline(aes(xintercept=median(PitchRate)),color="red")+geom_text(aes(x=0,y=50),label="median",color="red")+geom_text(aes(x=0.006,y=160),label=paste("mean: ",toString(round(mean(deltaAil$PitchRate),5))),color="green") +geom_text(aes(x=0.006,y=150),label=paste("median: ",toString(median(deltaAil$PitchRate))),color="red") + geom_text(aes(x=0.006,y=140),label=paste("std: ",toString(round(sd(deltaAil$PitchRate),5))),color="blue")
+```
+
+Para la variable 'PitchRate' sí que se tiene una distribución normal.
+
+\ 
+
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable currPitch
+ggplot(deltaAil, aes(x=currPitch))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(currPitch)),color="green")+labs(title="Distribucion de currPitch")+geom_text(aes(x=0.013,y=30),label="mean",color="green")+geom_vline(aes(xintercept=median(currPitch)),color="red")+geom_text(aes(x=0.007,y=30),label="median",color="red")+geom_text(aes(x=0.025,y=55),label=paste("mean: ",toString(round(mean(deltaAil$currPitch),5))),color="green") +geom_text(aes(x=0.025,y=50),label=paste("median: ",toString(median(deltaAil$currPitch))),color="red") + geom_text(aes(x=0.025,y=45),label=paste("std: ",toString(round(sd(deltaAil$currPitch),5))),color="blue")
+```
+
+
+Esta variable también presenta una buena distribución normal con una ligera cola a la derecha.
+
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable currRoll
+ggplot(deltaAil, aes(x=currRoll))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(currRoll)),color="green")+labs(title="Distribucion de currRoll")+geom_text(aes(x=-0.003,y=10),label="mean",color="green")+geom_vline(aes(xintercept=median(currRoll)),color="red")+geom_text(aes(x=0.01,y=10),label="median",color="red")+geom_text(aes(x=0.03,y=22),label=paste("mean: ",toString(round(mean(deltaAil$currRoll),5))),color="green") +geom_text(aes(x=0.03,y=20),label=paste("median: ",toString(median(deltaAil$currRoll))),color="red") + geom_text(aes(x=0.03,y=18),label=paste("std: ",toString(round(sd(deltaAil$currRoll),5))),color="blue")
+```
+
+Al contrario de lo que se estaba descubriendo anteriormente, para esta variable no tenemos una buena distribución de los datos.
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Distribución de la variable diffRollRate
+ggplot(deltaAil, aes(x=diffRollRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(xintercept=mean(diffRollRate)),color="green")+labs(title="Distribucion de diffRollRate")+geom_text(aes(x=-0.0001,y=500),label="mean",color="green")+geom_vline(aes(xintercept=median(diffRollRate)),color="red")+geom_text(aes(x=0.0001,y=500),label="median",color="red")+geom_text(aes(x=0.0005,y=1200),label=paste("mean: ",toString(round(mean(deltaAil$diffRollRate),10))),color="green") +geom_text(aes(x=0.0005,y=1050),label=paste("median: ",toString(median(deltaAil$diffRollRate))),color="red") + geom_text(aes(x=0.0005,y=900),label=paste("std: ",toString(round(sd(deltaAil$diffRollRate),10))),color="blue")
+```
+
+
+Por último, para esta variable volvemos a tener una distribución normal con una ligera cola a la izquierda.
+
+
+###Normalización
+
+Al igual que hicimos para el problema anterior, vamos a realizar una normalización sobre los datos para conseguir que su desviación típica sea de 1 y estudiar si con estos datos se consiguen modelos con un mejor comportamiento.
+
+
+```{r}
+#Normalización del dataset
+deltaAilNormalizado <- data.frame(deltaAil)
+
+deltaAilNormalizado$RollRate <- scale(deltaAil$RollRate)
+deltaAilNormalizado$PitchRate <- scale(deltaAil$PitchRate)
+deltaAilNormalizado$currPitch <- scale(deltaAil$currPitch)
+deltaAilNormalizado$currRoll <- scale(deltaAil$currRoll)
+deltaAilNormalizado$diffRollRate <- scale(deltaAil$diffRollRate)
+```
+
+###Análisis de correlaciones
+
+
+Por último, vamos a analizar las correlaciones entre las variables predictoras para descubrir si hay alguna que nos esté dando la misma información que otra y por lo tanto no sea relevante:
+
+```{r}
+#Correlación entre variable predictoras
+max(abs(cor(deltaAil[-6]))%%1)
+```
+
+
+Descubrimos que la máxima correlación encontrada no es muy relevante por lo que podemos concluir que no hay dos variables demasiado similares entre ellas.
+
+
+\newpage
+
+#Regresión
+
+Una vez estudiados y tratados los datos de 'deltaAil', procedemos a construir los modelos que puedan precedir futuras observaciones en este problema de regresión.
+
+
+##Regresión lineal simple
+
+Empezamos por el algoritmo más simple de todos, la regresión lineal simple. Aunque al tener 5 regresores en el conjunto de datos se realizará un modelo simple para cada uno de ellos, podemos saber por dónde empezar gracias al estudio de correlaciones que se hizo en el anterior apartado de análisis de datos.
+
+```{r}
+#Correlación de las variables respecto a la variable de salida
+cor(deltaAil)[6,]
+```
+
+Destaca 'RollRate' con un 77.2% de correlación negativa. De hecho, podemos visualizar esta correlación:
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Correlación entre Sa y RollRate
+plot(Sa~RollRate,deltaAil)
+```
+
+###Construcción de los modelos lineales simples
+
+```{r}
+#Construcción modelo simple con RollRate
+fit1=lm(Sa~RollRate,data=deltaAil)
+summary(fit1)
+```
+
+Acierto del 59.64%
+
+\ 
+
+
+```{r}
+#Construcción modelo simple con PitchRate
+fit2=lm(Sa~PitchRate,data=deltaAil)
+summary(fit2)
+```
+
+Acierto del 0.02%
+
+\ 
+
+```{r}
+#Construcción modelo simple con currPitch
+fit3=lm(Sa~currPitch,data=deltaAil)
+summary(fit3)
+```
+
+Acierto del 2.92%
+
+\ 
+
+```{r}
+#Construcción modelo simple con currRoll
+fit4=lm(Sa~currRoll,data=deltaAil)
+summary(fit4)
+```
+Acierto del 0.34%
+
+\ 
+
+```{r}
+#Construcción modelo simple con diffRollRate
+fit5=lm(Sa~diffRollRate,data=deltaAil)
+summary(fit5)
+```
+
+Acierto del 31.68%
+
+\ 
+
+Se obtienen en general una modelos bastantes pobres utilizando regresión lineal simple. El que obtiene un mejor resultado es el construido con la variable 'RollRate' con un 59.64% de acierto, coincidiendo con la variable que mostró anteriormente una mayor correlación.
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Modelo simple construido con RollRate
+plot(Sa~RollRate,data=deltaAil)
+abline(fit1,col="blue")
+confint(fit1)
+```
+
+\ 
+
+También podemos observar la predicción que haría este modelo para nuevos datos así como hacer el cálculo manual del RMSE para el conjunto de test aunque se utilice aquí el propio conjunto de entrenamiento:
+
+```{r}
+#Ejemplo de predicción del modelo simple
+predict(fit1,data.frame(RollRate=c(0.01,-0.01,1)))
+```
+
+\ 
+
+```{r}
+#Cálculo del RMSE para el modelo simple construido
+yprime=predict(fit1,data.frame(RollRate=deltaAil$RollRate))
+sqrt(sum(abs(deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+\ 
+
+En esta regresión lineal simple no es necesario utilizar datos normalizados pues se obtendrán los mismos resultados, al fin y al cabo, se tienen las mismas correlaciones:
+
+```{r}
+#Modelo simple con datos normalizados
+fit1n=lm(Sa~RollRate,data=deltaAilNormalizado)
+summary(fit1n)
+```
+
+##Regresión lineal múltiple
+
+Es este tipo de regresión se realiza una combinación de diferentes variables predictoras. Si hacemos un breve estudio de las correlaciones entre las diferentes variables predictoras, podremos descubrir "parejas" de variables interesantes con las que, si alguna de las variables es interesante para el modelo, posiblemente la otra variable de la pareja también lo sea:
+
+```{r}
+#Corerlaciones entre las variables predictoras
+cor(deltaAil)[-6,-6]
+```
+
+Los valores más elevados son las correlaciones de "diffRollRate" con "currRoll" y "diffRollRate" con "RollRate" por lo que serán parejas interesantes de predictores a tener en cuenta en este tipo de modelos.
+
+\ 
+
+Dado que estudiar cada una de las combinaciones posibles de variables sería demasiado costoso, se procede a hacer el estudio con todas las variables y, a continuación, ir presciendiendo de las menos relevantes con el fin de conseguir un modelo más simple con el mismo acierto.
+
+```{r}
+#Construcción de modelo lineal múltiple
+fit6 = lm(Sa~.,data=deltaAil)
+summary(fit6)
+```
+
+\ 
+
+Se consigue una importante mejora al utilizar todas las variables, pasando del 59.64% de acierto hasta un 67.75%. Ahora debemos ir eliminando las variables más irrelevantes, fijándonos en los p-values más altos:
+
+```{r}
+#Construcción de modelo lineal múltiple
+fit7 = lm(Sa~.-currPitch,data=deltaAil)
+summary(fit7)
+```
+
+
+Compensa que haya habido una ligera reducción en el acierto a cambio de un modelo más interpretable.
+
+\ 
+
+```{r}
+#Construcción de modelo lineal múltiple
+fit8 = lm(Sa~.-currPitch-PitchRate,data=deltaAil)
+summary(fit8)
+```
+
+
+Similar al caso anterior, se ha perdido muy poco en el acierto. Hemos conseguido un acierto del 67.62% con un modelo "sencillo" con tan solo 3 variables. Dado que se indica ahora que para todas las variables restante hay un p-value muy bajo, todas ellas son relevantes para el modelo y no hay que prescindir ya de ninguna.
+
+\ 
+
+Calculando ahora el error RMSE:
+```{r}
+#Cálculo de RMSE para el modelo lineal múltiple 8
+yprime=predict(fit8,deltaAil)
+sqrt(sum(abs(deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+
+\ 
+
+Podemos incluso dibujar este modelo, en cada una de las variables, para observar su comportamiento:
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Comportamiento del modelo lineal múltiple construido para la variable RollRate
+plot(deltaAil$Sa~deltaAil$RollRate)
+points(deltaAil$RollRate,fitted(fit8),col="blue",pch=20)
+```
+
+\ 
+
+```{r, echo=FALSE}
+#Comportamiento del modelo lineal múltiple construido para la variable currRoll
+plot(deltaAil$Sa~deltaAil$currRoll)
+points(deltaAil$currRoll,fitted(fit8),col="blue",pch=20)
+```
+
+\ 
+
+```{r, echo=FALSE, fig.width=7,fig.height=4}
+#Comportamiento del modelo lineal múltiple construido para la variable diffRollRate
+plot(deltaAil$Sa~deltaAil$diffRollRate)
+points(deltaAil$diffRollRate,fitted(fit8),col="blue",pch=20)
+```
+
+
+###Interacciones y no-linealidad
+
+
+En este apartado se trata de descubrir otro tipo de interacciones más complejas entre las variables del modelo que ya tenemos con el fin de que un comportamiento más complejo se traduzca en un mayor acierto.
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit9 = lm(Sa~RollRate+I(RollRate^2),data=deltaAil)
+summary(fit9)
+```
+
+Se obtiene un acierto de 59.95% con una sola variable. Cuando se construyó el modelo simple para esta misma variable se obtuvo un acierto del 59.64% por lo que se ha conseguido una ligera mejorar al incluir una interacción consigo misma. 
+
+\ 
+
+Así, se procede a ir construyendo diferentes modelos con diferentes interacciones, buscando mejorar el acierto siempre que el modelo no sea demasiado complejo. Al igual que en las construcciones de los modelos anteriores, nos iremos fijando también en los p-values para descubrir variables que no estén aportando al modelo:
+
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit10 = lm(Sa~RollRate+diffRollRate+I(RollRate^2)+I(diffRollRate^2)+I((RollRate+diffRollRate)^2),
+           data=deltaAil)
+summary(fit10)
+```
+
+Acierto de 64.75%.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit11 = lm(Sa~RollRate+diffRollRate+currRoll+I((RollRate+diffRollRate+currRoll)^2),
+           data=deltaAil)
+summary(fit11)
+```
+
+Acierto de 67.63%.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit12 = lm(Sa~RollRate+PitchRate+currPitch+currRoll+diffRollRate+I((RollRate+PitchRate+currPitch
+          +currRoll+diffRollRate)^2),data=deltaAil)
+summary(fit12)
+```
+
+
+Acierto de 67.74%.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit13 = lm(Sa~RollRate+currRoll+diffRollRate+RollRate*currRoll+RollRate*diffRollRate,data=deltaAil)
+summary(fit13)
+```
+
+
+Acierto de 67.76%.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit14 = lm(Sa~RollRate+currRoll+diffRollRate+RollRate*currRoll+RollRate*diffRollRate+I(RollRate^2)
+           +I(currRoll^2)+I(diffRollRate^2),data=deltaAil)
+summary(fit14)
+```
+
+
+Acierto de 67.82%.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit15 = lm(Sa~RollRate+currRoll+diffRollRate+((RollRate+currRoll+diffRollRate)^2)+I(RollRate^2)
+           +I(currRoll^2)+I(diffRollRate^2),data=deltaAil)
+summary(fit15)
+```
+
+
+Acierto de 67.83%
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit16 = lm(Sa~RollRate+currRoll+diffRollRate+currPitch+PitchRate+(.^2)+I(RollRate^2)+I(currRoll^2)
+           +I(diffRollRate^2),data=deltaAil)
+summary(fit16)
+```
+
+Acierto del 69.46%. Aunque hasta ahora presenta el mayor acierto, es bastante más complejo que el resto de modelos.
+
+\ 
+
+```{r}
+#Construcción de modelo múltiple con interacciones
+fit17 = lm(Sa~RollRate+currRoll+diffRollRate+currPitch+PitchRate+(.^3)+I(RollRate^3)+I(currRoll^3)
+           +I(diffRollRate^3)+I(PitchRate^3)+I(currPitch^3),data=deltaAil)
+summary(fit17)
+```
+
+Un acierto del 69.95%. Un modelo mucho más complejo que los demás que, sin embargo, no obtiene una mejora considerable.
+ 
+\ 
+
+
+Como conclusión final de este apartado, el modelo finalmente elegido sería el construido únicamente con las variables "RollRate", "currRoll" y "diffRollRate" sin ningún tipo de interacción. Este modelo, que obtuvo un acierto del 67.62%, es mucho más sencillo que este último y, sin embargo, su acierto es únicamente un 2% inferior por lo que se convierte en el modelo más interesante del estudio realizado.
+
+
+##Knn
+
+En este apartado se seguirá trabajando sobre el problema de regresión utilizando un modelo Knn, "vecino más cercano".
+
+Para las construcción de los diferentes modelos de Knn se pueden utilizar las variables que dieron mejores resultado en el apartado anterior. No obstante, la mejor selección de predictores para un modelo de regresión lineal no implica que también lo sea para Knn por lo que se deberán probar otras posibles variables.
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+require(kknn)
+fitknn1 <- kknn(Sa ~ .-currPitch-PitchRate, deltaAil, deltaAil)
+yprime = fitknn1$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+
+Aquí se utiliza el que fue el mejor modelo en regresión y se consigue bajar el RMSE utilizando Knn, bajando del 0.000172 que se consiguió a 0.000122, empleando las mismas variables.
+
+\ 
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn2 <- kknn(Sa ~ ., deltaAil, deltaAil)
+yprime = fitknn2$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+Utilizando todas las variables se baja a 0.000117.
+
+\ 
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn3 <- kknn(Sa ~ RollRate, deltaAil, deltaAil)
+yprime = fitknn3$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+
+Con el modelo más simple posible, utilizando únicamente la variable "RollRate" se obtiene un RMSE de 0.00019.
+
+\ 
+
+Probamos ahora con modelos más complejos utilizando interacciones entre las variables. Recordar que en el apartado anterior, este tipo de modelos apenas conseguían mejoras a cambio de una complejidad bastante mayor.
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn4 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+RollRate*diffRollRate, deltaAil, deltaAil)
+yprime = fitknn4$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+ 
+Añaniendo la primera interacción la mejora es mínima, de 0.000117 a 0.000116.
+
+\ 
+ 
+ 
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn5 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+RollRate*diffRollRate+I(RollRate^2)
+                +I(diffRollRate^2), deltaAil, deltaAil)
+yprime = fitknn5$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+ 
+
+Nuevamente con un modelo más complejo la mejora es muy leve.
+
+\ 
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn6 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^2),
+                deltaAil, deltaAil)
+yprime = fitknn6$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+Se consigue bajar ahora hasta 0.000105.
+
+\ 
+
+```{r}
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn7 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^3), deltaAil,
+                deltaAil)
+yprime = fitknn7$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+
+Nuevamente, un modelo mucho más complejo con una mejora mínima.
+
+\newpage 
+
+Con estos resultados se podría diferenciar 2 modelos interesantes. El segundo modelo construido con todas las variables pero sin ninguna interacción con un RMSE de 0.000117, un modelo bastante simple. El sexto modelo, con interacciones entre variables de todas contra todas con un RMSE de 0.000105 a cambio de una complejidad mayor.
+
+\ 
+
+Dado que en esta ocasión no es tan complejo este último modelo, se decide tomarlo finalmente como modelo final. 
+
+\ 
+
+Podemos ahora utilizar este mismo modelo con los datos normalizados aunque previsiblemente no se conseguirán mejorar los resultados:
+
+```{r}
+#Construcción de modelo utlizando kNN con datos normalizados y obtención de RMSE
+fitknnNorm <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^2),
+                   deltaAilNormalizado, deltaAilNormalizado)
+yprime = fitknnNorm$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+```
+
+Efectivamente, el error es muy similar, incluso algo mayor, al utilizar datos normalizados.
+
+##Comparación
+
+En este último apartado se procede a la comparación entre los algoritmos de regresión utilizando los resultados obtenidos para este 'dataset'.
+
+Antes de empezar, debemos obtener el MSE para ambos algoritmos utilizando validación cruzada con el fin de evitar un sobreajuste por parte del modelo.
+
+
+```{r}
+#Cálculo de MSE para el algoritmo "lm" utilizando validación cruzada
+setwd("./delta_ail")
+
+nombre <- "delta_ail"
+run_lm_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-5-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-5-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  In <- length(names(x_tra)) - 1
+  names(x_tra)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tra)[In+1] <- "Y"
+  names(x_tst)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tst)[In+1] <- "Y"
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  fitMulti=lm(Y~.-X2-X3,x_tra)
+  yprime=predict(fitMulti,test)
+  sum(abs(test$Y-yprime)^2)/length(yprime) ##MSE
+}
+lmMSEtrain<-mean(sapply(1:5,run_lm_fold,nombre,"train"))
+lmMSEtest<-mean(sapply(1:5,run_lm_fold,nombre,"test"))
+```
+
+\ 
+
+```{r}
+#Cálculo de MSE para el algoritmo "knn" utilizando validación cruzada
+setwd("./delta_ail")
+
+nombre <- "delta_ail"
+run_knn_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-5-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-5-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  In <- length(names(x_tra)) - 1
+  names(x_tra)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tra)[In+1] <- "Y"
+  names(x_tst)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tst)[In+1] <- "Y"
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  fitMulti=kknn(Y~.+(.^2),x_tra,test)
+  yprime=fitMulti$fitted.values
+  sum(abs(test$Y-yprime)^2)/length(yprime) ##MSE
+}
+knnMSEtrain<-mean(sapply(1:5,run_knn_fold,nombre,"train"))
+knnMSEtest<-mean(sapply(1:5,run_knn_fold,nombre,"test"))
+```
+
+\ 
+
+Estos son los resultados obtenidos:
+
+```{r}
+#Resultados de train y test para los algoritmos lm y kNN
+lmMSEtrain
+lmMSEtest
+knnMSEtrain
+knnMSEtest
+```
+
+
+Gracias al haber realizado validación cruzada tenemos una conclusión interesante sobre ambos modelos. Cuando se construyó el modelo final para "Knn" se obtuvo un mejor resultado que con "lm" a cambio de un modelo más complejo. Sin embargo, descubrimos ahora que el modelo para "Knn" hizo sobreaprendizaje pues el error para los datos de test es superior al de train, haciendo incluso que ahora el modelo de "lm" sea mejor, tiene un error menor con mucha menos complejidad.
+
+\ 
+
+Se actualizan los ficheros ".csv" correspondientes con estos nuevos resultados y se comparan ya en sí los algoritmos:
+
+
+```{r}
+#Preparación tablas para tests de comparación
+setwd("./delta_ail")
+
+resultados <- read.csv("regr_test_alumnos.csv")
+tablatst <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatst) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatst) <- resultados[,1]
+
+resultados <- read.csv("regr_train_alumnos.csv")
+tablatra <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatra) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatra) <- resultados[,1]
+```
+
+\ 
+
+
+```{r}
+#Test de Wilcoxon
+difs <- (tablatst[,1] - tablatst[,2]) / tablatst[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatst)[1], colnames(tablatst)[2])
+head(wilc_1_2)
+
+LMvsKNNtst <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+```
+
+\ 
+
+Y aquí tenemos los valores finales:
+
+```{r}
+#Resultados de test de Wilcoxon
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+```
+
+
+Con estos resultados del Test de  Wilcoxon podemos concluir que no existen diferencias relevantes entre los algoritmos de "Knn" y "lm" pues sólo se tiene un 20.12% de confianza de que sean distintos.
+
+\ 
+
+Se puede realizar el mismo experimento para los datos de entrenamiento aunque, por lo que ha sucedido, podemos interpretar que los valores que se obtengan pueden no ser realmente fiables:
+
+```{r}
+#Test de Wilcoxon para resultados de entrenamiento
+difs <- (tablatra[,1] - tablatra[,2]) / tablatra[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatra)[1], colnames(tablatra)[2])
+head(wilc_1_2)
+
+LMvsKNNtra <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtra$statistic
+pvalue <- LMvsKNNtra$p.value
+LMvsKNNtra <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtra$statistic
+
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+```
+
+Con los datos de "train" el Test nos indica totalmente lo opuesto, que está confiado al 99.97% de que los algoritmos son distintos. Sin embargo, dado que a nosotros nos interesa los resultados de test, pues hemos descubierto que puede existir sobreaprendizaje en los modelos, concluimos que ambos algoritmos son similares con un 80% de confianza.
+
+
+\ 
+
+Por último se realizará una comparativa múltiple entre los algoritmos de "lm", "Knn" y "M5" utilizando el test de Friedman y el de Post-hoc Holm.
+
+
+```{r}
+#Test de Friedman
+test_friedman <- friedman.test(as.matrix(tablatst))
+test_friedman
+```
+
+
+Con un p-value de tan solo 0.06, el Test de Friedman indica que hay diferencias significativas entre, al menos, dos de los algoritmos.
+
+\ 
+
+```{r}
+#Test de post-hoc Holm
+tam <- dim(tablatst)
+groups <- rep(1:tam[2], each=tam[1])
+pairwise.wilcox.test(as.matrix(tablatst), groups, p.adjust = "holm", paired = TRUE)
+```
+
+Este último Test de Post-hoc Holm nos indica que no hay diferencias entre los algoritmos de "Knn" y "lm" pues se tiene tan solo un 3% de confianza de que sean distintos. Sin embargo, sí que hay diferencias a favor del algoritmos M5' pues, para ambos algoritmos, se obtiene una confianza del 73% de que son distintos.
+
+
+\newpage
+
+#Clasificación
+
+Nuestro problema de clasificación trata con el conjunto de datos 'Heart' ya estudiado. En este problema se trata de poder construir y entrenar un modelo de clasificación a partir de este 'dataset' que, posteriormente, sea capaz de indicar para nuevas observaciones si se trata de una enfermedad del corazón o no. Se construirán diferentes modelos con diferentes algoritmos para poder a continuación comparar sus resultados y decidir qué modelo se comporta mejor.
+
+##Algoritmo Knn
+
+El primero modelo se construirá utilizando el algoritmo de "vecino más cercano". Dado que su comportamiento varía en función del parámetro "k" utilizado, se probarán diferentes para encontrar así el mejor modelo posible.
+
+\ 
+
+Empezamos dividiendo el 'dataset' en datos de entrenamiento y de test en una relación de 80-20:
+
+
+```{r}
+#División del dataset en entrenamiento y test
+set.seed(10)
+shuffled <- sample(dim(heart)[1])
+eightypct <- (dim(heart)[1] * 80) %/% 100
+heart_train <- heart[shuffled[1:eightypct], 1:13]
+heart_test <- heart[shuffled[(eightypct+1):dim(heart)[1]], 1:13]
+
+heart_train_labels <- heart[shuffled[1:eightypct], 14]
+heart_test_labels <- heart[shuffled[(eightypct+1):dim(heart)[1]], 14]
+```
+
+\ 
+
+Se realiza la misma división para los datos normalizados:
+
+```{r}
+#División de los datos normalizados en entrenamiento y test
+set.seed(10)
+shuffledN <- sample(dim(heartNormalizado)[1])
+heartN_train <- heartNormalizado[shuffledN[1:eightypct], 1:13]
+heartN_test <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 1:13]
+
+heartN_train_labels <- heartNormalizado[shuffledN[1:eightypct], 14]
+heartN_test_labels <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 14]
+```
+
+
+\ 
+
+Ya sí procedemos a construir los diferentes modelos empleando diferentes "k":
+
+```{r}
+#Construcción de modelos utilizando kNN con diferentes "k"
+library(class)
+require(caret)
+set.seed(10)
+getKnn <- function(miK){
+
+  heart_test_pred <- knn(train = heart_train, test = heart_test, cl = heart_train_labels, k=miK)
+  
+  postResample(pred = heart_test_pred, obs = heart[shuffled[(eightypct+1):dim(heart)[1]], 14])  
+}
+result1 <- lapply(1:20,getKnn)
+result1 <- unlist(result1)[1:20*2-1]
+#Dado que existe aleatoriedad en este proceso se realiza 5 veces y se trata con la media
+result2 <- lapply(1:20,getKnn)
+result2 <- unlist(result2)[1:20*2-1]
+result3 <- lapply(1:20,getKnn)
+result3 <- unlist(result3)[1:20*2-1]
+result4 <- lapply(1:20,getKnn)
+result4 <- unlist(result4)[1:20*2-1]
+result5 <- lapply(1:20,getKnn)
+result5 <- unlist(result5)[1:20*2-1]
+
+result<-unlist(Map("+",unlist(Map("+",unlist(Map("+",unlist(Map("+",result1,result2)),
+                                                 result3)),result4)),result5))
+
+result<-result/5
+```
+
+\ 
+
+
+```{r, echo=TRUE, warning= FALSE, fig.height=4}
+#Gráfica de resultados obtenidos con diferentes "k"
+df <- data.frame(k=1:20,accuracy=result)
+ggplot(df, aes(x=k,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="deepskyblue"
+                )+coord_cartesian(ylim=c(0.65,0.8))+ labs(title="Acierto de kNN con diferentes k")  
+```
+
+\ 
+
+```{r}
+#Mejor resultado obtenido
+max(result)
+```
+
+
+Dado que existe aletoriedad en el proceso de obtención de resultados, se ha repetido el proceso 5 veces para, a continuación, hacer la media y tener un cálculo más aproximado. Gracias al gráfico obtenido sabemos que el acierto mayor ha sido de 79.62% que se ha alcanzado con k=17 por lo que éste sería el modelo que se elegiría.
+
+\ 
+
+A continuación se realiza el mismo experimento con los datos normalizados para descubrir posibles cambios en el comportamiento del modelo:
+
+
+```{r}
+#Construcción de modelos con kNN con datos normalizados y diferentes "k"
+set.seed(10)
+getKnn <- function(miK){
+
+  heart_test_pred <- knn(train = heartN_train, test = heartN_test, cl = heartN_train_labels, k=miK)
+
+  postResample(pred = heart_test_pred, obs = 
+                 heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 14])  
+}
+
+result1 <- lapply(1:20,getKnn)
+result1 <- unlist(result1)[1:20*2-1]
+#Dado que existe aleatoriedad en este proceso se realiza 5 veces y se trata con la media
+result2 <- lapply(1:20,getKnn)
+result2 <- unlist(result2)[1:20*2-1]
+result3 <- lapply(1:20,getKnn)
+result3 <- unlist(result3)[1:20*2-1]
+result4 <- lapply(1:20,getKnn)
+result4 <- unlist(result4)[1:20*2-1]
+result5 <- lapply(1:20,getKnn)
+result5 <- unlist(result5)[1:20*2-1]
+
+result<-unlist(Map("+",unlist(Map("+",unlist(Map("+",unlist(Map("+",result1,result2)),
+                                                 result3)),result4)),result5))
+
+result<-result/5
+```
+
+\ 
+
+```{r, echo=TRUE, warning= FALSE, fig.height=4}
+#Gráfica con resultados de kNN y sus diferentes "k"
+df <- data.frame(k=1:20,accuracy=result)
+
+ggplot(df, aes(x=k,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="deepskyblue"
+  )+coord_cartesian(ylim=c(0.7,0.85))+ labs(title="Acierto de kNN con diferentes k en datos normalizados")
+```
+
+\ 
+
+```{r}
+#Mejor resultado obtenido
+max(result)
+```
+
+
+Gracias a que se normalizasen los datos continuos del 'dataset', el modelo se ha comportado mejor con estos datos y se ha conseguido una mejora hasta alcanzar el 83.3% de acierto. En esta ocasión, los mejores resultados han sido con k=13 y k=15 que, dado que la complejidad es prácticamente la misma, el modelo final sería con cualquierda de los dos "k" si se decidiese utilizar los datos normalizados.
+
+
+##Algoritmo LDA
+
+A continuación vamos a estudiar otros modelos empleando el algoritmo LDA.
+
+\ 
+
+Lo primero será dividir el conjunto de datos en datos de entrenamiento y de test. Al igual que se hizo en el algoritmo anterior, la relación será de 80%-20%.
+
+```{r}
+#División de los datos en entrenamiento y test
+set.seed(10)
+shuffled <- sample(dim(heart)[1])
+eightypct <- (dim(heart)[1] * 80) %/% 100
+heart_train <- heart[shuffled[1:eightypct], ]
+heart_test <- heart[shuffled[(eightypct+1):dim(heart)[1]], ]
+```
+
+\ 
+
+Ahora sí construimos el modelo:
+
+```{r}
+#Construcción del modelo con LDA
+library(MASS)
+library(ISLR)
+ldaFit <- lda(Class ~.,data=heart_train)
+ldaFit
+```
+
+\ 
+
+Con el modelo ya entrenado se realiza la predicción utilizando los datos de test:
+
+```{r}
+#Resultados del modelo construido con LDA
+ldaPred <- predict(ldaFit,heart_test)
+
+table(ldaPred$class,heart_test$Class)
+resultLDA <- mean(ldaPred$class==heart_test$Class)
+resultLDA
+```
+
+
+Se obtiene un acierto del 88.9%, una notable mejora respecto al algoritmo kNN.
+
+\ 
+
+Dado que se consiguió una mejora interesante al emplear datos normalizados, igualmente se realiza ahora el mismo experimento con estos datos pues este tipo de algoritmos asumen que los datos siguen unas distribución normal:
+
+```{r}
+#Construcción y resultados de un modelo LDA sobre datos normalizados
+set.seed(10)
+shuffledN <- sample(dim(heartNormalizado)[1])
+heartN_train <- heartNormalizado[shuffledN[1:eightypct], ]
+heartN_test <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], ]
+
+ldaFitN <- lda(Class ~.,data=heartN_train)
+ldaFitN
+
+ldaPredN <- predict(ldaFitN,heartN_test)
+table(ldaPredN$class,heartN_test$Class)
+resultLDAN <- mean(ldaPredN$class==heartN_test$Class)
+resultLDAN
+
+```
+
+Se obtiene exactamente el mismo acierto, 88.9%. Por lo tanto descubrimos que no ha variado el comportamiento del algoritmo para este conjunto de datos ya estén normalizados o no.
+
+
+##Algoritmo QDA
+
+De igual forma se realiza este experimento con el algoritmo QDA:
+
+\ 
+
+Entrenamos el modelo:
+
+```{r}
+#Construcción del modelo con QDA
+qdaFit <- qda(Class ~.,data=heart_train)
+qdaFit
+```
+
+\ 
+
+```{r}
+#Resultados del modelo construido con QDA
+qdaPred <- predict(qdaFit,heart_test)
+
+table(qdaPred$class,heart_test$Class)
+resultQDA <- mean(qdaPred$class==heart_test$Class)
+resultQDA
+```
+
+\newpage
+
+El resultado obtenido para QDA ha sido el mismo que para LDA, 88.9% de acierto. Aunque son algoritmos diferentes, al fin y al cabo, QDA es una versión más genérica de LDA por lo que existe la posibilidad de que para un conjunto de datos concreto se obtenga el mismo resultado.
+
+\ 
+
+Podemos realizar el mismo experimento con los datos normalizados aunque previsiblemente se obtendrá el mismo resultado:
+
+```{r}
+#Construcción y resultados del modelo QDA sobre datos normalizados
+qdaFitN <- qda(Class ~.,data=heartN_train)
+qdaFitN
+
+qdaPredN <- predict(qdaFitN,heartN_test)
+table(qdaPredN$class,heartN_test$Class)
+resultQDAN <- mean(qdaPredN$class==heartN_test$Class)
+resultQDAN
+```
+
+Efectivamente se obtiene el mismo resultado.
+
+##Comparativa entre algorimos
+
+En esta última sección se hara una comparativa entre los 3 algoritmos vistos anteriormente.
+
+Lo primero será utilizar validación cruzada para tener unos resultados más veraces de los algoritmos:
+
+
+###Validación cruzada kNN
+
+Se utilizarán los datos normalizados ya que propiciaron un mejor comportamiento para el algoritmo kNN:
+
+```{r}
+#Obtención de resultados de kNN utilizando validación cruzada y diferentes "k"
+setwd("./heart")
+
+nombre <- "heart"
+run_knn_fold <- function(i, x, tt = "test",miK) {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Normalizacion
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced",
+  "Oldpeak", "Slope", "MajorVessels", "Thal", "Class")
+  
+  heartN_train$RestBloodPressure <- scale(heartN_train$RestBloodPressure)
+  heartN_train$SerumCholestoral <- scale(heartN_train$SerumCholestoral)
+  heartN_train$MaxHeartRate <- scale(heartN_train$MaxHeartRate)
+  heartN_train$Oldpeak <- scale(heartN_train$Oldpeak)
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  heartN_test$RestBloodPressure <- scale(heartN_test$RestBloodPressure)
+  heartN_test$SerumCholestoral <- scale(heartN_test$SerumCholestoral)
+  heartN_test$MaxHeartRate <- scale(heartN_test$MaxHeartRate)
+  heartN_test$Oldpeak <- scale(heartN_test$Oldpeak)
+  
+  #Preparacion datos
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  heartN_train_labels <- heartN_train$Class
+  heartN_test_labels <- heartN_test$Class
+  
+  heartN_train <- heartN_train[,1:13]
+  heartN_test <- heartN_test[,1:13]
+  
+  #Construcción modelo kNN y resultado
+  heart_test_pred <- knn(train = heartN_train, test = heartN_test, cl = heartN_train_labels, k=miK)
+  postResample(pred = heart_test_pred, obs = heartN_test_labels) 
+}
+
+#Función utilizada para construir modelos con diferentes "k"
+mejorK <- function(miK){
+  
+  knnAcctrain<-mean(sapply(1:10,run_knn_fold,nombre,"train",miK))
+  knnAcctest<-mean(sapply(1:10,run_knn_fold,nombre,"test",miK))
+  list(knnAcctrain,knnAcctest)
+}
+
+resultados <- lapply(1:20,mejorK)
+```
+
+\ 
+
+Aunque ya se hizo el estudio de con qué "k" se comportaba mejor el modelo, dado que ahora se está tratando con otra distribución de los datos, es posible que cambie la mejor "k" para el algoritmo. Por ello, se realiza la validación cruzada con diferentes "k" para escoger finalmente el mejor resultado de los datos de "test":
+
+```{r}
+#Obtención de la mejor "k"
+which.max(unlist(resultados)[1:20*2])
+```
+
+Descubrimos que con k=7 se obtiene el mejor resultado.
+
+\ 
+
+```{r}
+#Resultados obtenidos
+knnAcctrain <- unlist(resultados[7])[1]
+knnAcctest <- unlist(resultados[7])[2]
+knnAcctrain
+knnAcctest
+```
+
+Finalmente tenemos para los datos de entrenamiento un acierto del 75.39% y para test un 70.09%. Por lo tanto ha habido algo de sobreaprendizaje por parte del modelo, pues el resultado para test es algo inferior al de "train".
+
+
+###Validación cruzada LDA
+
+Dado que descubrimos que el comportamiento del algoritmo con los datos normalizados o no era exactamente el mismo, no es necesario entonces que hagamos normalización para obtener estos nuevos resultados.
+
+```{r}
+#Resultado de modelo LDA utilizando validación cruzada
+setwd("./heart")
+
+nombre <- "heart"
+run_lda_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Preparación datos
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  #Construcción modelo y resultado
+  ldaFit <- lda(Class ~.,data=heartN_train)
+  ldaPred <- predict(ldaFit,heartN_test)
+  
+  table(ldaPred$class,heartN_test$Class)
+  resultLDA <- mean(ldaPred$class==heartN_test$Class)
+  resultLDA
+  
+}
+
+#Resultados obtenidos
+ldaAcctrain<-mean(sapply(1:10,run_lda_fold,nombre,"train"))
+ldaAcctest<-mean(sapply(1:10,run_lda_fold,nombre,"test"))
+ldaAcctrain
+ldaAcctest
+
+```
+
+Para el algoritmo LDA obtenemos un acierto de 85.78% para "train" y un acierto de 85.76% para test, un buen resultado que además nos muestra que no ha existido sobreaprendizaje pues es un valor muy similar al obtenido en el entrenamiento.
+
+
+###Validación cruzada QDA
+
+```{r}
+#Resultados del modelo QDA utilizando validación cruzada
+setwd("./heart")
+
+nombre <- "heart"
+run_qda_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Preparación datos
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  #Construcción de modelo
+  qdaFit <- qda(Class ~.,data=heartN_train)
+  qdaPred <- predict(qdaFit,heartN_test)
+  
+  table(qdaPred$class,heartN_test$Class)
+  resultQDA <- mean(qdaPred$class==heartN_test$Class)
+  resultQDA
+  
+}
+
+
+#Resultados obtenidos
+qdaAcctrain<-mean(sapply(1:10,run_qda_fold,nombre,"train"))
+qdaAcctest<-mean(sapply(1:10,run_qda_fold,nombre,"test"))
+qdaAcctrain
+qdaAcctest
+```
+
+Para el algoritmo QDA se obtiene 87.85% de acierto para los datos de entrenamiento y 83.46% para el test. Si bien siguen siendo unos buenos resultados, en esta ocasión sí que ha existido algo de sobreentrenamiento pues el resultado para test es algo inferior.
+
+
+\newpage 
+
+Con estos resultados finales podemos decir que el algoritmo con mejores resultados para este 'dataset' ha sido LDA con un 85.76% de acierto. Está seguido de QDA con 83.46% y ya notablemente inferior ha sido kNN con 70.09% de acierto.
+
+\ 
+
+Por último quedaría comprobar cómo de diferentes son estos algoritmos entre ellos empleando los resultados de los algoritmos de otros 'datasets' y los resultados que acabamos de obtener:
+
+##Test de Wilcoxon
+
+Empezamos realizando el test de Wilcoxon realizando comparaciones 1 vs 1 para saber cómo de diferentes son los algoritmos entre ellos. Estas comparaciones sólo se harán con los datos de test pues dado que hemos visto que puedo haber sobreaprendizaje en el entrenamiento, el resultado de los tests podría llevarnos a confusión.
+
+```{r}
+#Preparación tablas para comparación de algoritmos
+setwd("./heart")
+
+resultados <- read.csv("clasif_test_alumnos.csv")
+tablatst <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatst) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatst) <- resultados[,1]
+```
+
+\ 
+
+```{r}
+#Test de Wilcoxon
+#kNN vs LDA
+difs <- (tablatst[,1] - tablatst[,2]) / tablatst[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatst)[1], colnames(tablatst)[2])
+head(wilc_1_2)
+
+LMvsKNNtst <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+```
+
+El test de Wilcoxon nos indica que hay un 47.83% de confianza de que sean distintos kNN y LDA.
+
+\ 
+
+```{r}
+#Test de Wilcoxon
+#kNN vs QDA
+difs <- (tablatst[,1] - tablatst[,3]) / tablatst[,1]
+wilc_1_3 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_3) <- c(colnames(tablatst)[1], colnames(tablatst)[3])
+head(wilc_1_3)
+
+LMvsKNNtst <- wilcox.test(wilc_1_3[,1], wilc_1_3[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_3[,2], wilc_1_3[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+```
+
+
+Se muestra mucha seguridad de que los algoritmos de kNN y QDA son distintos, con un 82.31% de confianza sobre ellos.
+
+\ 
+
+```{r}
+#Test de Wilcoxon
+#LDA vs QDA
+difs <- (tablatst[,2] - tablatst[,3]) / tablatst[,2]
+wilc_2_3 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_2_3) <- c(colnames(tablatst)[2], colnames(tablatst)[3])
+head(wilc_2_3)
+
+LMvsKNNtst <- wilcox.test(wilc_2_3[,1], wilc_2_3[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_2_3[,2], wilc_2_3[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+```
+
+En el caso de LDA vs QDA, el test de Wilcoxon no ha detectado diferencias relevantes entre ellos pues sólo nos muestra un 24.38% de confianza de que sean distintos.
+ 
+\ 
+
+##Comparación múltiple
+
+El test de Friedman nos indicará si hay diferencias entre algunos de los algoritmos
+
+```{r}
+#Test de Friedman
+test_friedman <- friedman.test(as.matrix(tablatst))
+test_friedman
+```
+
+Con un p-value de 0.7047, este test indica que no parece que haya algoritmos distintos entre ellos pues sólo tiene un 30% de confianza de que por lo menos 2 de los algoritmos sean distintos.
+
+\ 
+
+Por último se realiza el test de Post-hoc Holm:
+
+```{r}
+#Test de post-hoc Holm
+tam <- dim(tablatst)
+groups <- rep(1:tam[2], each=tam[1])
+pairwise.wilcox.test(as.matrix(tablatst), groups, p.adjust = "holm", paired = TRUE)
+```
+
+Este test nos indica un 100% confianza de que el algoritmo LDA es igual a kNN y a QDA. Si bien sorprende que muestre que kNN y LDA son iguales, puede ser que para otros 'datasets' se hayan obtenido resultados muy similares para ambos algoritmos. Por último, sí que muestra que hay diferencias entre kNN y QDA con 47% de confianza.
+
+
+\newpage
+
+#Apéndice
+
+En este apéndice se muestra todo el código utilizado en este trabajo.
+
+##Análisis de datos
+
+```{r, eval=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## ------------------------------------------------------------------------
+#Carga de los 'datasets'
+library(ggplot2)
+heart <- read.csv("./heart/heart.dat",
+          comment.char = "@", header = FALSE)
+
+names(heart) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral", 
+"FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+"Slope", "MajorVessels", "Thal", "Class")
+
+deltaAil <- read.csv("./delta_ail/delta_ail.dat",comment.char = "@", header = FALSE)
+
+names(deltaAil) <- c("RollRate", "PitchRate", "currPitch", "currRoll", "diffRollRate", "Sa")
+## ------------------------------------------------------------------------
+
+#####################################################
+#Análisis dataset heart
+####################################################
+
+## ------------------------------------------------------------------------
+#Dimensiones del dataset heart
+dim(heart)
+
+#Nombre de las variables
+colnames(heart)
+
+#Tipo atómico de cada variable
+unlist(lapply(heart,class))
+
+#Estructura del dataset
+class(heart)
+unique(heart$Class)
+
+#Conversión de la variable de salida a un factor
+heart$Class <- factor(heart$Class, levels = c(1, 2), labels = c("Si", "No"))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Comprobación de missing values
+which(is.na(heart) == TRUE)
+
+#Comprobación de valores duplicados
+which(duplicated(heart) == TRUE)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Proporción de la variable de salida
+round(prop.table(table(heart$Class)) * 100, digits = 1)
+
+#Proporción de las variables discretas predictoras
+round(prop.table(table(heart$Sex)) * 100, digits = 1)
+round(prop.table(table(heart$ChestPainType)) * 100, digits = 1)
+round(prop.table(table(heart$FastingBloodSugar)) * 100, digits = 1)
+round(prop.table(table(heart$ResElectrocardiographic)) * 100, digits = 1)
+round(prop.table(table(heart$ExerciseInduced)) * 100, digits = 1)
+round(prop.table(table(heart$Slope)) * 100, digits = 1)
+round(prop.table(table(heart$MajorVessels)) * 100, digits = 1)
+round(prop.table(table(heart$Thal)) * 100, digits = 1)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Distribución de la variable Age
+ggplot(heart, aes(x=Age)) + geom_histogram(binwidth = 5,color="black",fill="lightblue")+labs(
+  title="Distribucion de Age")
+
+#Distribución de la variable RestBloodPressure
+ggplot(heart, aes(x=RestBloodPressure))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(RestBloodPressure)),color="green")+labs(title="Distribucion de RestBlood
+  Pressure")+geom_text(aes(x=136,y=0.01),label="mean",color="green")+geom_vline(aes(xintercept
+  =median(RestBloodPressure)),color="red")+geom_text(aes(x=124,y=0.01),label="median",color=
+  "red")+geom_text(aes(x=180,y=0.02),label=paste("mean: ",toString(round(mean(
+  heart$RestBloodPressure),2))),color="green") +geom_text(aes(x=179,y=0.018),label=paste("median: "
+  ,toString(median(heart$RestBloodPressure))),color="red") + geom_text(aes(x=179,y=0.016),label=
+  paste("std: ",toString(round(sd(heart$RestBloodPressure),2))),color="blue")
+
+#Distribución de la variable SerumCholestoral
+ggplot(heart, aes(x=SerumCholestoral))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(SerumCholestoral)),color="green")+labs(title="Distribucion de SerumCholestor
+  al")+geom_text(aes(x=272,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(
+  SerumCholestoral)),color="red")+geom_text(aes(x=224,y=0.004),label="median",color="red"
+  )+geom_text(aes(x=400,y=0.007),label=paste("mean: ",toString(round(mean(heart$SerumCholestoral),
+  2))),color="green") +geom_text(aes(x=400,y=0.0065),label=paste("median: ",toString(median(
+  heart$SerumCholestoral))),color="red") + geom_text(aes(x=400,y=0.006),label=paste("std: ",
+  toString(round(sd(heart$SerumCholestoral),2))),color="blue")
+
+#Distribución de la variable MaxHeartRate
+ggplot(heart, aes(x=MaxHeartRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(MaxHeartRate)),color="green")+labs(title="Distribucion de MaxHeartRate"
+  )+geom_text(aes(x=140,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(
+  MaxHeartRate)),color="red")+geom_text(aes(x=160,y=0.004),label="median",color="red"
+  )+geom_text(aes(x=190,y=0.014),label=paste("mean: ",toString(round(mean(heart$MaxHeartRate),
+  2))),color="green") +geom_text(aes(x=190,y=0.012),label=paste("median: ",toString(median(
+  heart$MaxHeartRate))),color="red") + geom_text(aes(x=190,y=0.01),label=paste("std: ",
+  toString(round(sd(heart$MaxHeartRate),2))),color="blue")
+
+#Distribución de la variable Oldpeak
+ggplot(heart, aes(x=Oldpeak))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(Oldpeak)),color="green")+labs(title="Distribucion de Oldpeak")+geom_text(
+  aes(x=12,y=0.004),label="mean",color="green")+geom_vline(aes(xintercept=median(Oldpeak)),
+  color="red")+geom_text(aes(x=2,y=0.004),label="median",color="red")+geom_text(aes(x=40,y=0.044),
+  label=paste("mean: ",toString(round(mean(heart$Oldpeak),2))),color="green") +geom_text(aes(x=40,
+  y=0.04),label=paste("median: ",toString(median(heart$Oldpeak))),color="red") + geom_text(aes(
+  x=40,y=0.036),label=paste("std: ",toString(round(sd(heart$Oldpeak),2))),color="blue")
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Normalización del dataset
+heartNormalizado <- data.frame(heart)
+heartNormalizado$RestBloodPressure <- scale(heartNormalizado$RestBloodPressure)
+heartNormalizado$SerumCholestoral <- scale(heartNormalizado$SerumCholestoral)
+heartNormalizado$MaxHeartRate <- scale(heartNormalizado$MaxHeartRate)
+heartNormalizado$Oldpeak <- scale(heartNormalizado$Oldpeak)
+
+#Maxima correlacion entre las variables predictoras
+max(abs(cor(heart[-14]))%%1)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Dimensiones del dataset delta_Ail
+dim(deltaAil)
+## ------------------------------------------------------------------------
+
+
+
+#####################################################
+#Análisis dataset deltaAil
+####################################################
+
+## ------------------------------------------------------------------------
+#Nombre de las variables del dataset
+colnames(deltaAil)
+
+#Tipo atomico de cada variable
+unlist(lapply(deltaAil,class))
+
+#Estructura del dataset y de la variable de salida
+class(deltaAil)
+min(deltaAil$Sa)
+max(deltaAil$Sa)
+
+#Correlación respecto a la variable de salida
+cor(deltaAil)[6,]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Comprobación de missing values
+which(is.na(deltaAil) == TRUE)
+
+#Comprobación de valores duplicados
+which(duplicated(deltaAil) == TRUE)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Distribución de la variable de salida Sa
+ggplot(deltaAil, aes(x=Sa))+geom_density(color="darkblue",fill="lightblue")+labs(
+  title="Distribucion de la variable de salida Sa")
+
+#Distribución de la variable RollRate
+ggplot(deltaAil, aes(x=RollRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(RollRate)),color="green")+labs(title="Distribucion de RollRate")+geom_text(
+  aes(x=-0.001,y=15),label="mean",color="green")+geom_vline(aes(xintercept=median(RollRate)),
+  color="red")+geom_text(aes(x=0.004,y=15),label="median",color="red")+geom_text(aes(x=0.012,y=60),
+  label=paste("mean: ",toString(round(mean(deltaAil$RollRate),5))),color="green") +geom_text(
+  aes(x=0.012,y=55),label=paste("median: ",toString(median(deltaAil$RollRate))),color="red"
+  )+geom_text(aes(x=0.012,y=50),label=paste("std: ",toString(round(sd(deltaAil$RollRate),5))),color
+  ="blue")
+
+#Distribución de la variable PitchRate
+ggplot(deltaAil, aes(x=PitchRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(PitchRate)),color="green")+labs(title="Distribucion de PitchRate")+geom_text(
+  aes(x=0.0015,y=50),label="mean",color="green")+geom_vline(aes(xintercept=median(PitchRate)),color
+  ="red")+geom_text(aes(x=0,y=50),label="median",color="red")+geom_text(aes(x=0.006,y=160),label=
+  paste("mean: ",toString(round(mean(deltaAil$PitchRate),5))),color="green") +geom_text(aes(x=
+  0.006,y=150),label=paste("median: ",toString(median(deltaAil$PitchRate))),color="red")+geom_text(
+  aes(x=0.006,y=140),label=paste("std: ",toString(round(sd(deltaAil$PitchRate),5))),color="blue")
+
+#Distribución de la variable currPitch
+ggplot(deltaAil, aes(x=currPitch))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(currPitch)),color="green")+labs(title="Distribucion de currPitch")+geom_text(
+  aes(x=0.013,y=30),label="mean",color="green")+geom_vline(aes(xintercept=median(currPitch)),
+  color="red")+geom_text(aes(x=0.007,y=30),label="median",color="red")+geom_text(aes(x=0.025,y=55),
+  label=paste("mean: ",toString(round(mean(deltaAil$currPitch),5))),color="green") +geom_text(
+  aes(x=0.025,y=50),label=paste("median: ",toString(median(deltaAil$currPitch))),color="red"
+  )+geom_text(aes(x=0.025,y=45),label=paste("std: ",toString(round(sd(deltaAil$currPitch),5))),
+  color="blue")
+
+#Distribución de la variable currRoll
+ggplot(deltaAil, aes(x=currRoll))+geom_density(color="darkblue",fill="lightblue")+geom_vline(aes(
+  xintercept=mean(currRoll)),color="green")+labs(title="Distribucion de currRoll")+geom_text(aes(
+  x=-0.003,y=10),label="mean",color="green")+geom_vline(aes(xintercept=median(currRoll)),color=
+  "red")+geom_text(aes(x=0.01,y=10),label="median",color="red")+geom_text(aes(x=0.03,y=22),label=
+  paste("mean: ",toString(round(mean(deltaAil$currRoll),5))),color="green") +geom_text(aes(x=0.03,
+  y=20),label=paste("median: ",toString(median(deltaAil$currRoll))),color="red") + geom_text(aes(
+  x=0.03,y=18),label=paste("std: ",toString(round(sd(deltaAil$currRoll),5))),color="blue")
+
+#Distribución de la variable diffRollRate
+ggplot(deltaAil, aes(x=diffRollRate))+geom_density(color="darkblue",fill="lightblue")+geom_vline(
+  aes(xintercept=mean(diffRollRate)),color="green")+labs(title="Distribucion de diffRollRate"
+  )+geom_text(aes(x=-0.0001,y=500),label="mean",color="green")+geom_vline(aes(xintercept=median(
+  diffRollRate)),color="red")+geom_text(aes(x=0.0001,y=500),label="median",color="red")+geom_text(
+  aes(x=0.0005,y=1200),label=paste("mean: ",toString(round(mean(deltaAil$diffRollRate),10))),color
+  ="green") +geom_text(aes(x=0.0005,y=1050),label=paste("median: ",toString(median(
+  deltaAil$diffRollRate))),color="red")+geom_text(aes(x=0.0005,y=900),label=paste("std: ",toString(
+  round(sd(deltaAil$diffRollRate),10))),color="blue")
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Normalización del dataset
+deltaAilNormalizado <- data.frame(deltaAil)
+
+deltaAilNormalizado$RollRate <- scale(deltaAil$RollRate)
+deltaAilNormalizado$PitchRate <- scale(deltaAil$PitchRate)
+deltaAilNormalizado$currPitch <- scale(deltaAil$currPitch)
+deltaAilNormalizado$currRoll <- scale(deltaAil$currRoll)
+deltaAilNormalizado$diffRollRate <- scale(deltaAil$diffRollRate)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Correlación entre variable predictoras
+max(abs(cor(deltaAil[-6]))%%1)
+## ------------------------------------------------------------------------
+```
+
+
+##Regresión
+
+```{r, eval=FALSE}
+
+######################################################
+#Problema de Regresión
+######################################################
+
+
+## ------------------------------------------------------------------------
+#Correlación de las variables respecto a la variable de salida
+cor(deltaAil)[6,]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Correlación entre Sa y RollRate
+plot(Sa~RollRate,deltaAil)
+
+#Construcción modelo simple con RollRate
+fit1=lm(Sa~RollRate,data=deltaAil)
+summary(fit1)
+
+#Construcción modelo simple con PitchRate
+fit2=lm(Sa~PitchRate,data=deltaAil)
+summary(fit2)
+
+#Construcción modelo simple con currPitch
+fit3=lm(Sa~currPitch,data=deltaAil)
+summary(fit3)
+
+#Construcción modelo simple con currRoll
+fit4=lm(Sa~currRoll,data=deltaAil)
+summary(fit4)
+
+#Construcción modelo simple con diffRollRate
+fit5=lm(Sa~diffRollRate,data=deltaAil)
+summary(fit5)
+
+#Modelo simple construido con RollRate
+plot(Sa~RollRate,data=deltaAil)
+abline(fit1,col="blue")
+confint(fit1)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Ejemplo de predicción del modelo simple
+predict(fit1,data.frame(RollRate=c(0.01,-0.01,1)))
+
+#Cálculo del RMSE para el modelo simple construido
+yprime=predict(fit1,data.frame(RollRate=deltaAil$RollRate))
+sqrt(sum(abs(deltaAil$Sa-yprime)^2)/length(yprime))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Modelo simple con datos normalizados
+fit1n=lm(Sa~RollRate,data=deltaAilNormalizado)
+summary(fit1n)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Correlaciones entre las variables predictoras
+cor(deltaAil)[-6,-6]
+
+#Construcción de modelo lineal múltiple
+fit6 = lm(Sa~.,data=deltaAil)
+summary(fit6)
+
+#Construcción de modelo lineal múltiple
+fit7 = lm(Sa~.-currPitch,data=deltaAil)
+summary(fit7)
+
+#Construcción de modelo lineal múltiple
+fit8 = lm(Sa~.-currPitch-PitchRate,data=deltaAil)
+summary(fit8)
+
+#Cálculo de RMSE para el modelo lineal múltiple 8
+yprime=predict(fit8,deltaAil)
+sqrt(sum(abs(deltaAil$Sa-yprime)^2)/length(yprime))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Comportamiento del modelo lineal múltiple construido para la variable RollRate
+plot(deltaAil$Sa~deltaAil$RollRate)
+points(deltaAil$RollRate,fitted(fit8),col="blue",pch=20)
+
+#Comportamiento del modelo lineal múltiple construido para la variable currRoll
+plot(deltaAil$Sa~deltaAil$currRoll)
+points(deltaAil$currRoll,fitted(fit8),col="blue",pch=20)
+
+#Comportamiento del modelo lineal múltiple construido para la variable diffRollRate
+plot(deltaAil$Sa~deltaAil$diffRollRate)
+points(deltaAil$diffRollRate,fitted(fit8),col="blue",pch=20)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción de modelo múltiple con interacciones
+fit9 = lm(Sa~RollRate+I(RollRate^2),data=deltaAil)
+summary(fit9)
+
+#Construcción de modelo múltiple con interacciones
+fit10 = lm(Sa~RollRate+diffRollRate+I(RollRate^2)+I(diffRollRate^2)+I((RollRate+diffRollRate)^2),
+           data=deltaAil)
+summary(fit10)
+
+#Construcción de modelo múltiple con interacciones
+fit11 = lm(Sa~RollRate+diffRollRate+currRoll+I((RollRate+diffRollRate+currRoll)^2),
+           data=deltaAil)
+summary(fit11)
+
+#Construcción de modelo múltiple con interacciones
+fit12 = lm(Sa~RollRate+PitchRate+currPitch+currRoll+diffRollRate+I((RollRate+PitchRate+currPitch
+          +currRoll+diffRollRate)^2),data=deltaAil)
+summary(fit12)
+
+#Construcción de modelo múltiple con interacciones
+fit13 = lm(Sa~RollRate+currRoll+diffRollRate+RollRate*currRoll+RollRate*diffRollRate,data=deltaAil)
+summary(fit13)
+
+#Construcción de modelo múltiple con interacciones
+fit14 = lm(Sa~RollRate+currRoll+diffRollRate+RollRate*currRoll+RollRate*diffRollRate+I(RollRate^2)
+           +I(currRoll^2)+I(diffRollRate^2),data=deltaAil)
+summary(fit14)
+
+#Construcción de modelo múltiple con interacciones
+fit15 = lm(Sa~RollRate+currRoll+diffRollRate+((RollRate+currRoll+diffRollRate)^2)+I(RollRate^2)
+           +I(currRoll^2)+I(diffRollRate^2),data=deltaAil)
+summary(fit15)
+
+#Construcción de modelo múltiple con interacciones
+fit16 = lm(Sa~RollRate+currRoll+diffRollRate+currPitch+PitchRate+(.^2)+I(RollRate^2)+I(currRoll^2)
+           +I(diffRollRate^2),data=deltaAil)
+summary(fit16)
+
+#Construcción de modelo múltiple con interacciones
+fit17 = lm(Sa~RollRate+currRoll+diffRollRate+currPitch+PitchRate+(.^3)+I(RollRate^3)+I(currRoll^3)
+           +I(diffRollRate^3)+I(PitchRate^3)+I(currPitch^3),data=deltaAil)
+summary(fit17)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción de modelo utlizando kNN y obtención de RMSE
+require(kknn)
+fitknn1 <- kknn(Sa ~ .-currPitch-PitchRate, deltaAil, deltaAil)
+yprime = fitknn1$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn2 <- kknn(Sa ~ ., deltaAil, deltaAil)
+yprime = fitknn2$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn3 <- kknn(Sa ~ RollRate, deltaAil, deltaAil)
+yprime = fitknn3$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn4 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+RollRate*diffRollRate, deltaAil, deltaAil)
+yprime = fitknn4$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn5 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+RollRate*diffRollRate+I(RollRate^2)
+                +I(diffRollRate^2), deltaAil, deltaAil)
+yprime = fitknn5$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn6 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^2),
+                deltaAil, deltaAil)
+yprime = fitknn6$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN y obtención de RMSE
+fitknn7 <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^3), deltaAil,
+                deltaAil)
+yprime = fitknn7$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+
+#Construcción de modelo utlizando kNN con datos normalizados y obtención de RMSE
+fitknnNorm <- kknn(Sa ~ RollRate+diffRollRate+currRoll+currPitch+PitchRate+(.^2), 
+                   deltaAilNormalizado, deltaAilNormalizado)
+yprime = fitknnNorm$fitted.values
+sqrt(sum((deltaAil$Sa-yprime)^2)/length(yprime))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Cálculo de MSE para el algoritmo "lm" utilizando validación cruzada
+setwd("./delta_ail")
+
+nombre <- "delta_ail"
+run_lm_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-5-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-5-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  In <- length(names(x_tra)) - 1
+  names(x_tra)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tra)[In+1] <- "Y"
+  names(x_tst)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tst)[In+1] <- "Y"
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  fitMulti=lm(Y~.-X2-X3,x_tra)
+  yprime=predict(fitMulti,test)
+  sum(abs(test$Y-yprime)^2)/length(yprime) ##MSE
+}
+lmMSEtrain<-mean(sapply(1:5,run_lm_fold,nombre,"train"))
+lmMSEtest<-mean(sapply(1:5,run_lm_fold,nombre,"test"))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Cálculo de MSE para el algoritmo "knn" utilizando validación cruzada
+setwd("./delta_ail")
+
+nombre <- "delta_ail"
+run_knn_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-5-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-5-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  In <- length(names(x_tra)) - 1
+  names(x_tra)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tra)[In+1] <- "Y"
+  names(x_tst)[1:In] <- paste ("X", 1:In, sep="")
+  names(x_tst)[In+1] <- "Y"
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  fitMulti=kknn(Y~.+(.^2),x_tra,test)
+  yprime=fitMulti$fitted.values
+  sum(abs(test$Y-yprime)^2)/length(yprime) ##MSE
+}
+knnMSEtrain<-mean(sapply(1:5,run_knn_fold,nombre,"train"))
+knnMSEtest<-mean(sapply(1:5,run_knn_fold,nombre,"test"))
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Resultados de train y test para los algoritmos lm y kNN
+lmMSEtrain
+lmMSEtest
+knnMSEtrain
+knnMSEtest
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Preparación tablas para tests de comparación
+setwd("./delta_ail")
+
+resultados <- read.csv("regr_test_alumnos.csv")
+tablatst <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatst) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatst) <- resultados[,1]
+
+resultados <- read.csv("regr_train_alumnos.csv")
+tablatra <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatra) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatra) <- resultados[,1]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Wilcoxon
+difs <- (tablatst[,1] - tablatst[,2]) / tablatst[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatst)[1], colnames(tablatst)[2])
+head(wilc_1_2)
+
+LMvsKNNtst <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+
+#Resultados de test de Wilcoxon
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Wilcoxon para resultados de entrenamiento
+difs <- (tablatra[,1] - tablatra[,2]) / tablatra[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatra)[1], colnames(tablatra)[2])
+head(wilc_1_2)
+
+LMvsKNNtra <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtra$statistic
+pvalue <- LMvsKNNtra$p.value
+LMvsKNNtra <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtra$statistic
+
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Friedman
+test_friedman <- friedman.test(as.matrix(tablatst))
+test_friedman
+
+#Test de post-hoc Holm
+tam <- dim(tablatst)
+groups <- rep(1:tam[2], each=tam[1])
+pairwise.wilcox.test(as.matrix(tablatst), groups, p.adjust = "holm", paired = TRUE)
+## ------------------------------------------------------------------------
+```
+
+##Clasificación
+
+```{r, eval=FALSE}
+###################################################
+#Problema de Clasificación
+###################################################
+
+
+## ------------------------------------------------------------------------
+#División del dataset en entrenamiento y test
+set.seed(10)
+shuffled <- sample(dim(heart)[1])
+eightypct <- (dim(heart)[1] * 80) %/% 100
+heart_train <- heart[shuffled[1:eightypct], 1:13]
+heart_test <- heart[shuffled[(eightypct+1):dim(heart)[1]], 1:13]
+
+heart_train_labels <- heart[shuffled[1:eightypct], 14]
+heart_test_labels <- heart[shuffled[(eightypct+1):dim(heart)[1]], 14]
+
+#División de los datos normalizados en entrenamiento y test
+set.seed(10)
+shuffledN <- sample(dim(heartNormalizado)[1])
+heartN_train <- heartNormalizado[shuffledN[1:eightypct], 1:13]
+heartN_test <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 1:13]
+
+heartN_train_labels <- heartNormalizado[shuffledN[1:eightypct], 14]
+heartN_test_labels <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 14]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción de modelos utilizando kNN con diferentes "k"
+library(class)
+require(caret)
+set.seed(10)
+getKnn <- function(miK){
+
+  heart_test_pred <- knn(train = heart_train, test = heart_test, cl = heart_train_labels, k=miK)
+  
+  postResample(pred = heart_test_pred, obs = heart[shuffled[(eightypct+1):dim(heart)[1]], 14])  
+}
+result1 <- lapply(1:20,getKnn)
+result1 <- unlist(result1)[1:20*2-1]
+#Dado que existe aleatoriedad en este proceso se realiza 5 veces y se trata con la media
+result2 <- lapply(1:20,getKnn)
+result2 <- unlist(result2)[1:20*2-1]
+result3 <- lapply(1:20,getKnn)
+result3 <- unlist(result3)[1:20*2-1]
+result4 <- lapply(1:20,getKnn)
+result4 <- unlist(result4)[1:20*2-1]
+result5 <- lapply(1:20,getKnn)
+result5 <- unlist(result5)[1:20*2-1]
+
+result<-unlist(Map("+",unlist(Map("+",unlist(Map("+",unlist(Map("+",result1,result2)),
+                                                 result3)),result4)),result5))
+
+result<-result/5
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Gráfica de resultados obtenidos en diferentes "k"
+df <- data.frame(k=1:20,accuracy=result)
+ggplot(df, aes(x=k,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="deepskyblue"
+  )+coord_cartesian(ylim=c(0.65,0.8))+ labs(title="Acierto de kNN con diferentes k")  
+
+#Mejor resultado obtenido
+max(result)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción de modelos con kNN con datos normalizados y diferentes "k"
+set.seed(10)
+getKnn <- function(miK){
+
+  heart_test_pred <- knn(train = heartN_train, test = heartN_test, cl = heartN_train_labels, k=miK)
+
+  postResample(pred = heart_test_pred, obs = 
+                 heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], 14])  
+}
+
+result1 <- lapply(1:20,getKnn)
+result1 <- unlist(result1)[1:20*2-1]
+#Dado que existe aleatoriedad en este proceso se realiza 5 veces y se trata con la media
+result2 <- lapply(1:20,getKnn)
+result2 <- unlist(result2)[1:20*2-1]
+result3 <- lapply(1:20,getKnn)
+result3 <- unlist(result3)[1:20*2-1]
+result4 <- lapply(1:20,getKnn)
+result4 <- unlist(result4)[1:20*2-1]
+result5 <- lapply(1:20,getKnn)
+result5 <- unlist(result5)[1:20*2-1]
+
+result<-unlist(Map("+",unlist(Map("+",unlist(Map("+",unlist(Map("+",result1,result2)),
+                                                 result3)),result4)),result5))
+print(result)
+
+result<-result/5
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Gráfica con resultados de kNN y sus diferentes "k"
+df <- data.frame(k=1:20,accuracy=result)
+
+ggplot(df, aes(x=k,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="deepskyblue"
+  )+coord_cartesian(ylim=c(0.7,0.85))+ labs(title="Acierto de kNN con diferentes k en datos 
+  normalizados")
+
+#Mejor resultado obtenido
+max(result)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#División de los datos en entrenamiento y test
+set.seed(10)
+shuffled <- sample(dim(heart)[1])
+eightypct <- (dim(heart)[1] * 80) %/% 100
+heart_train <- heart[shuffled[1:eightypct], ]
+heart_test <- heart[shuffled[(eightypct+1):dim(heart)[1]], ]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción del modelo con LDA
+library(MASS)
+library(ISLR)
+ldaFit <- lda(Class ~.,data=heart_train)
+ldaFit
+
+#Resultados del modelo construido con LDA
+ldaPred <- predict(ldaFit,heart_test)
+
+table(ldaPred$class,heart_test$Class)
+resultLDA <- mean(ldaPred$class==heart_test$Class)
+resultLDA
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción y resultados de un modelo LDA sobre datos normalizados
+set.seed(10)
+shuffledN <- sample(dim(heartNormalizado)[1])
+heartN_train <- heartNormalizado[shuffledN[1:eightypct], ]
+heartN_test <- heartNormalizado[shuffledN[(eightypct+1):dim(heartNormalizado)[1]], ]
+
+ldaFitN <- lda(Class ~.,data=heartN_train)
+ldaFitN
+
+ldaPredN <- predict(ldaFitN,heartN_test)
+table(ldaPredN$class,heartN_test$Class)
+resultLDAN <- mean(ldaPredN$class==heartN_test$Class)
+resultLDAN
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción del modelo con QDA
+qdaFit <- qda(Class ~.,data=heart_train)
+qdaFit
+
+#Resultados del modelo construido con QDA
+qdaPred <- predict(qdaFit,heart_test)
+
+table(qdaPred$class,heart_test$Class)
+resultQDA <- mean(qdaPred$class==heart_test$Class)
+resultQDA
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Construcción y resultados del modelo QDA sobre datos normalizados
+qdaFitN <- qda(Class ~.,data=heartN_train)
+qdaFitN
+
+qdaPredN <- predict(qdaFitN,heartN_test)
+table(qdaPredN$class,heartN_test$Class)
+resultQDAN <- mean(qdaPredN$class==heartN_test$Class)
+resultQDAN
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Obtención de resultados de kNN utilizando validación cruzada y diferentes "k"
+setwd("./heart")
+
+nombre <- "heart"
+run_knn_fold <- function(i, x, tt = "test",miK) {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Normalizacion
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced",
+  "Oldpeak", "Slope", "MajorVessels", "Thal", "Class")
+  
+  heartN_train$RestBloodPressure <- scale(heartN_train$RestBloodPressure)
+  heartN_train$SerumCholestoral <- scale(heartN_train$SerumCholestoral)
+  heartN_train$MaxHeartRate <- scale(heartN_train$MaxHeartRate)
+  heartN_train$Oldpeak <- scale(heartN_train$Oldpeak)
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  heartN_test$RestBloodPressure <- scale(heartN_test$RestBloodPressure)
+  heartN_test$SerumCholestoral <- scale(heartN_test$SerumCholestoral)
+  heartN_test$MaxHeartRate <- scale(heartN_test$MaxHeartRate)
+  heartN_test$Oldpeak <- scale(heartN_test$Oldpeak)
+  
+  #Preparacion datos
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  heartN_train_labels <- heartN_train$Class
+  heartN_test_labels <- heartN_test$Class
+  
+  heartN_train <- heartN_train[,1:13]
+  heartN_test <- heartN_test[,1:13]
+  
+  #Construcción modelo kNN y resultado
+  heart_test_pred <- knn(train = heartN_train, test = heartN_test, cl = heartN_train_labels, k=miK)
+  postResample(pred = heart_test_pred, obs = heartN_test_labels) 
+  
+}
+
+#Función utilizada para construir modelos con diferentes "k"
+mejorK <- function(miK){
+  
+  knnAcctrain<-mean(sapply(1:10,run_knn_fold,nombre,"train",miK))
+  knnAcctest<-mean(sapply(1:10,run_knn_fold,nombre,"test",miK))
+  list(knnAcctrain,knnAcctest)
+}
+
+resultados <- lapply(1:20,mejorK)
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Obtención de la mejor "k"
+which.max(unlist(resultados)[1:20*2])
+
+#Resultados obtenidos
+knnAcctrain <- unlist(resultados[7])[1]
+knnAcctest <- unlist(resultados[7])[2]
+knnAcctrain
+knnAcctest
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Resultado de modelo LDA utilizando validación cruzada
+setwd("./heart")
+
+nombre <- "heart"
+run_lda_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Preparación datos
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  #Construcción modelo y resultado
+  ldaFit <- lda(Class ~.,data=heartN_train)
+  ldaPred <- predict(ldaFit,heartN_test)
+  
+  table(ldaPred$class,heartN_test$Class)
+  resultLDA <- mean(ldaPred$class==heartN_test$Class)
+  resultLDA
+  
+}
+
+#Resultados obtenidos
+ldaAcctrain<-mean(sapply(1:10,run_lda_fold,nombre,"train"))
+ldaAcctest<-mean(sapply(1:10,run_lda_fold,nombre,"test"))
+ldaAcctrain
+ldaAcctest
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Resultados del modelo QDA utilizando validación cruzada
+setwd("./heart")
+
+nombre <- "heart"
+run_qda_fold <- function(i, x, tt = "test") {
+  file <- paste(x, "-10-", i, "tra.dat", sep="")
+  x_tra <- read.csv(file, comment.char="@")
+  file <- paste(x, "-10-", i, "tst.dat", sep="")
+  x_tst <- read.csv(file, comment.char="@")
+  if (tt == "train") {
+    test <- x_tra
+  }
+  else {
+    test <- x_tst
+  }
+  
+  
+  #Preparación datos
+  heartN_train <- data.frame(x_tra)
+  names(heartN_train) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_test <- data.frame(test)
+  names(heartN_test) <- c("Age", "Sex", "ChestPainType", "RestBloodPressure", "SerumCholestoral",
+  "FastingBloodSugar", "ResElectrocardiographic", "MaxHeartRate", "ExerciseInduced", "Oldpeak",
+  "Slope", "MajorVessels", "Thal", "Class")
+  
+  
+  heartN_train$Class <- factor(heartN_train$Class, levels = c(1, 2), labels = c("Si", "No"))
+  heartN_test$Class <- factor(heartN_test$Class, levels = c(1, 2), labels = c("Si", "No"))
+  
+  #Construcción de modelo
+  qdaFit <- qda(Class ~.,data=heartN_train)
+  qdaPred <- predict(qdaFit,heartN_test)
+  
+  table(qdaPred$class,heartN_test$Class)
+  resultQDA <- mean(qdaPred$class==heartN_test$Class)
+  resultQDA
+  
+}
+
+
+#Resultados obtenidos
+qdaAcctrain<-mean(sapply(1:10,run_qda_fold,nombre,"train"))
+qdaAcctest<-mean(sapply(1:10,run_qda_fold,nombre,"test"))
+qdaAcctrain
+qdaAcctest
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Preparación tablas para comparación de algoritmos
+setwd("./heart")
+
+resultados <- read.csv("clasif_test_alumnos.csv")
+tablatst <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatst) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatst) <- resultados[,1]
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Wilcoxon
+#kNN vs LDA
+difs <- (tablatst[,1] - tablatst[,2]) / tablatst[,1]
+wilc_1_2 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_2) <- c(colnames(tablatst)[1], colnames(tablatst)[2])
+head(wilc_1_2)
+
+LMvsKNNtst <- wilcox.test(wilc_1_2[,1], wilc_1_2[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_2[,2], wilc_1_2[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Wilcoxon
+#kNN vs QDA
+difs <- (tablatst[,1] - tablatst[,3]) / tablatst[,1]
+wilc_1_3 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_1_3) <- c(colnames(tablatst)[1], colnames(tablatst)[3])
+head(wilc_1_3)
+
+LMvsKNNtst <- wilcox.test(wilc_1_3[,1], wilc_1_3[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_1_3[,2], wilc_1_3[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Wilcoxon
+#LDA vs QDA
+difs <- (tablatst[,2] - tablatst[,3]) / tablatst[,2]
+wilc_2_3 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_2_3) <- c(colnames(tablatst)[2], colnames(tablatst)[3])
+head(wilc_2_3)
+
+LMvsKNNtst <- wilcox.test(wilc_2_3[,1], wilc_2_3[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LMvsKNNtst$statistic
+pvalue <- LMvsKNNtst$p.value
+LMvsKNNtst <- wilcox.test(wilc_2_3[,2], wilc_2_3[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LMvsKNNtst$statistic
+Rmas
+Rmenos
+pvalue
+#Confianza
+(1-pvalue)*100
+## ------------------------------------------------------------------------
+
+
+## ------------------------------------------------------------------------
+#Test de Friedman
+test_friedman <- friedman.test(as.matrix(tablatst))
+test_friedman
+
+#Test de post-hoc Holm
+tam <- dim(tablatst)
+groups <- rep(1:tam[2], each=tam[1])
+pairwise.wilcox.test(as.matrix(tablatst), groups, p.adjust = "holm", paired = TRUE)
+## ------------------------------------------------------------------------
+
+```
+

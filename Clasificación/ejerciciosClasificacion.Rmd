@@ -1,0 +1,302 @@
+---
+title: "Ejercicios Clasificación"
+author: "Antonio Manuel Milán Jiménez"
+date: "29 de noviembre de 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = F)
+```
+
+#Diagnóstico de cáncer de mama con k-NN
+
+Para este conjunto de datos en el que tendremos que determiar si un tumor es benigno o maligno, utilizaremos un modelo k-NN con diferentes elecciones de "k".
+
+Primero cargamos los datos:
+
+```{r}
+wbcd <- read.csv("wisc_bc_data.csv", stringsAsFactors = FALSE)
+```
+
+##Preprocesamiento
+
+Eliminamos la característica "id":
+
+```{r}
+wbcd <- wbcd[,-1]
+```
+
+Reconvertimos la variables de diagnosis a un "factor":
+
+```{r}
+wbcd$diagnosis <- factor(wbcd$diagnosis, levels = c("B", "M"), labels = c("Benign", "Malignant"))
+```
+
+Podemos saber la proporción de los datos en cuanto a casos beningnos y malignos. Lo ideal sería una proporción de 50/50.
+
+```{r}
+round(prop.table(table(wbcd$diagnosis)) * 100, digits = 1)
+```
+
+A continuación vamos a normalizar los datos:
+
+```{r}
+wbcd_n <- as.data.frame(lapply(wbcd[,2:31], scale, center = TRUE, scale = TRUE))
+```
+
+##Preparación de conjuntos de entrenamiento y test
+
+```{r}
+shuffle_ds <- sample(dim(wbcd_n)[1])
+eightypct <- (dim(wbcd_n)[1] * 80) %/% 100
+wbcd_train <- wbcd_n[shuffle_ds[1:eightypct], ]
+wbcd_test <- wbcd_n[shuffle_ds[(eightypct+1):dim(wbcd_n)[1]], ]
+
+wbcd_train_labels <- wbcd[shuffle_ds[1:eightypct], 1]
+wbcd_test_labels <- wbcd[shuffle_ds[(eightypct+1):dim(wbcd_n)[1]], 1]
+```
+
+
+##Obtención del modelo y resultado
+
+Vamos ya a crear el modelo. Crearemos diversos modelos utilizando diferentes "k" para descubrir cómo varía el acierto del modelo en función de esto.
+
+```{r}
+library(class)
+require(caret)
+getKnn <- function(miK=1){
+
+  wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k=miK)
+
+  postResample(pred = wbcd_test_pred, obs = wbcd[shuffle_ds[(eightypct+1):dim(wbcd_n)[1]], 1])  
+}
+result <- lapply(1:20,getKnn)
+result<-unlist(result)[1:20*2-1]
+
+df <- data.frame(k=1:20,accuracy=result)
+
+ggplot(df, aes(x=k,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="deepskyblue")+coord_cartesian(ylim=c(0.9,1))+ labs(title="Accuracy in Knn with differents k")  
+```
+
+
+Con este gráfico descubrimos que se comporta mejor el modelo para valores de "k" más bajos (3,5,6,8,9) llegando al 95.61% de acierto.
+
+
+\newpage
+
+#Regresión logística con datos de "Stock Market"
+
+Vamos a trabajar con el dataset "The Stock Market" con el que, utilizando diferentes variables relacionadas con información de la Bolsa, se trata de predecir si la Bolsa "sube" o "baja".
+
+```{r}
+library(ISLR)
+names(Smarket)
+summary(Smarket)
+```
+
+
+Estudiando las correlaciones de las variables con la variable de salida encontramos, por ejemplo, que la variable "Today" es interesante.
+
+```{r}
+cor(as.numeric(Smarket$Direction),Smarket$Today)
+```
+
+Vamos a utilizar el paquete "caret" para realizar la regresión logística.
+
+```{r}
+require(caret)
+```
+
+Se va a comparar los resultados que obtenemos al utilizar únicamente un subconjunto del dataset cómo "train" para entrenar el modelo y al utilizar todo el conjunto de datos para construir el modelo. Dado que el dataset no está predividido en "train" y "test", una forma posible de hacerlo es en función del año del dato. De esta forma:
+
+```{r}
+train <- (Smarket$Year < 2005)
+test <- (Smarket$Year == 2005)
+```
+
+Otro punto interesante es que se va a realizar "cross-validation" con 10 particiones. Para trabajar con el paquete "caret" lo hacemos de la siguiente forma:
+
+```{r}
+train_control = trainControl(method="cv",number=10)
+```
+
+Ya sí pasamos a entrenar los modelos utilizando todas las variables:
+
+```{r}
+glmFit <- train(Smarket[train,-9], y = Smarket[train,9], method = "glm", preProcess = c("center", "scale"), tuneLength = 10, control=glm.control(maxit=500), trControl = train_control)
+glmFit
+
+glm.pred <- predict.train(glmFit,newdata=Smarket[test,])
+Direction.2005 <- Smarket$Direction[test]
+table(glm.pred,Direction.2005) 
+mean(glm.pred==Direction.2005)
+```
+
+Se obtiene en ambos casos más del 99% de acierto lo que se traduce en que se ha conseguido un buen modelo, no ha habido sobreajuste al utilizar cross-validation y que se ha hecho una buena división para el conjunto de test pues presenta un resultado muy similar.
+
+
+Trabajando ahora con todo el conjuto de datos para crear el modelo:
+
+```{r}
+glmFit <- train(Smarket[,-9], y = Smarket[,9], method = "glm", preProcess = c("center", "scale"), tuneLength = 10, control=glm.control(maxit=500), trControl = train_control)
+glmFit
+```
+
+Se obtiene un resultado muy similar, tan sólo un 0.3~0.4% inferior; por lo que podría interesarnos utilizar cómo modelo el anterior que sólo se entreno con los datos de "train", pues es ligeramente superior su resultado y algo más eficiente.
+
+ \newpage 
+ 
+#QDA y LDA con dataset "Stock Market"
+
+
+Vamos a realizar ahora una comparación entre estos dos algoritmos utilizando únicamente las variables "Lag".
+
+```{r}
+library(MASS)
+library(ISLR)
+lda.fit <- lda(Direction~Lag1+Lag2+Lag3+Lag4+Lag5,data=Smarket, subset=Year<2005)
+lda.fit
+```
+
+Ahora realizamos la predicción:
+
+```{r}
+Smarket.2005 <- subset(Smarket,Year==2005)
+lda.pred <- predict(lda.fit,Smarket.2005)
+```
+
+Y finalmente obtenemos los resultados:
+
+```{r}
+table(lda.pred$class,Smarket.2005$Direction)
+resultLDA <- mean(lda.pred$class==Smarket.2005$Direction)
+resultLDA
+```
+
+
+Se obtiene un acierto del 58.7%
+
+\ 
+\ 
+
+Probamos ahora el mismo experimento para el algoritmo QDA:
+
+```{r}
+qda.fit <- qda(Direction~Lag1+Lag2+Lag3+Lag4+Lag5, data=Smarket, subset=Year<2005)
+qda.fit
+```
+Realizamos la predicción y obtenemos finalmente los resultados:
+
+```{r}
+qda.pred <- predict(qda.fit,Smarket.2005)
+table(qda.pred$class,Smarket.2005$Direction)
+resultQDA <- mean(qda.pred$class==Smarket.2005$Direction)
+resultQDA
+```
+
+Se obtiene un acierto del 56.7%, 2 puntos por debajo de lo que conseguimos con lda.
+
+\ 
+
+Podemos incluso observar cómo han realizado la partición de ambos algoritmos, enfrentando 1 vs 1 las 5 variables. Estos son los ajustes para LDA:
+
+```{r}
+library(klaR)
+partimat(Direction~Lag1+Lag2+Lag3+Lag4+Lag5, data=Smarket, method="lda",nplots.vert=1,nplots.hor=1)
+```
+
+Y aquí los ajustes para QDA en los que se pueden observar ajustes muchos más complejos:
+
+```{r}
+partimat(Direction~Lag1+Lag2+Lag3+Lag4+Lag5, data=Smarket, method="qda",nplots.vert=1,nplots.hor=1)
+```
+
+
+Podemos también comparar ambos métodos la regresión logística vista anteriormente:
+
+
+```{r}
+train <- (Smarket$Year < 2005)
+glm.fit <- glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5, data=Smarket, family=binomial, subset=train)
+glm.probs <- predict(glm.fit,newdata=Smarket[!train,], type="response") 
+glm.pred <- ifelse(glm.probs >0.5,"Up","Down")
+Direction.2005 <- Smarket$Direction[!train]
+table(glm.pred,Direction.2005)
+resultGLM <- mean(glm.pred==Direction.2005)
+resultGLM
+```
+
+Se obtiene nuevamente un resultado demasiado bajo, un 58.7% de acierto. Viendo los resultados de los 3 algoritmos:
+
+
+
+```{r}
+df = data.frame(algorithms=c("LDA","QDA","GLM"),accuracy=c(resultLDA,resultQDA,resultGLM))
+ggplot(df,aes(x=algorithms,y=accuracy)) + geom_histogram(stat="identity",color="black",fill="lightgreen")+coord_cartesian(ylim=c(0.5,0.6))+ labs(title="Accuracy in Stock Market Dataset")
+```
+
+Se muestran algo superiores los algoritmos LDA y la regresión logística, aunque igualmente siguen teniendo resultados pobres para este conjunto de datos.
+
+
+
+\newpage
+
+#Comparación entre algoritmos
+
+Por último vamos a realizar la comparación de estos algoritmos utilizando para ello diferentes tests.
+
+Primero comparamos lda y qda utilizando Wilcoxon:
+
+```{r}
+resultados <- read.csv("/home/antonio/Descargas/clasif_train_alumnos.csv")
+tablatra <- cbind(resultados[,2:dim(resultados)[2]])
+colnames(tablatra) <- names(resultados)[2:dim(resultados)[2]]
+rownames(tablatra) <- resultados[,1]
+
+difs <- (tablatra[,2] - tablatra[,3]) / tablatra[,2]
+wilc_2_3 <- cbind(ifelse (difs<0, abs(difs)+0.1, 0+0.1), ifelse (difs>0, abs(difs)+0.1, 0+0.1))
+colnames(wilc_2_3) <- c(colnames(tablatra)[2], colnames(tablatra)[3])
+head(wilc_2_3)
+
+
+LDAvsQDAtst <- wilcox.test(wilc_2_3[,1], wilc_2_3[,2], alternative = "two.sided", paired=TRUE)
+Rmas <- LDAvsQDAtst$statistic
+pvalue <- LDAvsQDAtst$p.value
+LDAvsQDAtst <- wilcox.test(wilc_2_3[,2], wilc_2_3[,1], alternative = "two.sided", paired=TRUE)
+Rmenos <- LDAvsQDAtst$statistic
+Rmas
+Rmenos
+pvalue
+```
+
+Este test nos indica que hay diferencias significativas entre ambos algoritmos con una confianza del 84.7%
+
+
+\ 
+\ 
+
+Utilizando ahora el test de Friedman:
+
+```{r}
+test_friedman <- friedman.test(as.matrix(tablatra))
+test_friedman
+```
+
+
+Con un p-value de 0.52, este test nos indica que puede haber ciertas diferencias entre algunos de los algoritmos con una confianza del 48%.
+
+
+\ 
+\ 
+
+Finalmente aplicamos post-hoc Holm:
+
+```{r}
+tam <- dim(tablatra)
+groups <- rep(1:tam[2], each=tam[1])
+pairwise.wilcox.test(as.matrix(tablatra), groups, p.adjust = "holm", paired = TRUE)
+```
+
+Este test nos indica que "QDA" no parece tener diferencias muy significativas ni con "LDA" ni con "KNN". Además, indica que "LDA" y "KNN" son incluso más similares entre ellos.
