@@ -1,0 +1,121 @@
+---
+title: 'Análisis Exploratorio de Datos: Ejercicios'
+author: "Antonio Manuel Milán Jiménez"
+date: "10 de noviembre de 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Ejercicios:
+
+```{r}
+hip  <-read.table("http://astrostatistics.psu.edu/datasets/HIP_star.dat", header=T,fill=T)
+```
+
+
+ \ 
+
+Una vez descargado comprueba la dimensión y los nombres de las columnas del dataset. ¿Qué dimensión tiene? ¿qué datos alberga?
+
+```{r}
+dim(hip)
+```
+
+Vemos que las dimensiones son 2719x9.
+
+Estos son los nombres de las columnas:
+
+```{r}
+colnames(hip)
+```
+
+Y aquí podemos observar las primeras columna del dataset, comprobando que todas las variables son numéricas:
+
+```{r}
+hip[1:5,]
+```
+
+ \ 
+
+Muestra por pantalla la columna de la variable RA
+
+```{r}
+hip$RA[10]
+```
+
+ \ 
+
+Calcula las tendencias centrales de todos los datos del dataset (mean, media) utilizando la function apply
+
+```{r}
+apply(hip,2,mean,na.rm=TRUE)
+
+apply(hip,2,median,na.rm=TRUE)
+
+apply(hip,2,mode)
+```
+
+Es interesante destacar que al ser datos numericos, no es posible calcular la moda sobre ellos, ya que no hay ninguno que se repita. También es necesario eliminar los “missing values” de la variable “B.V” para calcular los valores
+correctamente.
+
+ \ 
+
+Haz lo mismo para las medidas de dispersión mínimo y máximo. ¿Seria posible hacerlo con un único comando?¿Que hace la función range()?
+
+
+```{r}
+apply(hip,2,range,na.rm=TRUE)
+```
+
+Podemos hacerlo en una sola línea ya que la función “range()” nos devovlerá un vector con el mínimo y el máximo de los datos proporcionados.
+
+
+ \ 
+ 
+Sin embargo las medidas mas populares de dispersión son la varianza (var()), su desviación standard (sd()) y la desviación absoluta de la mediana o MAD. Calcula estas medidas para los valores de RA
+
+```{r}
+var(hip$RA)
+
+sd(hip$RA)
+
+mad(hip$RA)
+```
+
+ \ 
+ 
+Imagina que quieres calcular dos de estos valores de una sola vez. ¿Te serviría este código?
+
+
+Sería necesario modificar la función para que pudiese tratar con los “missing values”:
+
+```{r}
+f = function(x) c(median(x,na.rm=TRUE), mad(x,na.rm=TRUE))
+
+f(hip[,1])
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

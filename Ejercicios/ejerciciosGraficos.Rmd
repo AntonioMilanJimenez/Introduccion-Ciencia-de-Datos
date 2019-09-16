@@ -1,0 +1,125 @@
+---
+title: "Ejercicios de Gráficos con R"
+author: "Antonio Manuel Milán Jiménez"
+date: "27 de noviembre de 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Ejercicio 1
+
+
+Tenemos estos datos:
+
+```{r}
+library(ggplot2)
+ex1 <- data.frame(stretch=c(46,54,48,50,44,42,52),distance=c(148,182,173,166,109,141,166))
+ex1
+```
+
+\ 
+ 
+Comparando "stretch" frente a "distance":
+
+```{r}
+ggplot(ex1, aes(x=stretch, y = distance)) + geom_line(col="blue") + labs(title="Stretch vs Distance")
+```
+
+
+Aunque se tienen pocos datos para poder determinar una tendencia, podríamos decir que a priori al aumentar "stretch" aumenta la distancia.
+
+
+# Ejercicio 2
+
+En este ejercicio vamos a estudiar la superficie de Europa y Asia que estuvo cubierta de nieve entre el año 1970 y 1979.
+
+```{r}
+ex2 <- data.frame(year=c(1970:1979),snow.cover=c(6.5,12.0,14.9,10.0,10.7,7.9,21.9,12.5,14.5,9.2))
+ex2
+```
+
+\ 
+
+
+```{r}
+ggplot(ex2, aes(x=year, y = snow.cover)) + geom_line(col="blue") + labs(title="Snow cover vs Year", y="Snow cover (millions of squared Km)") 
+```
+
+
+En este gráfico, en el que se ha enfrentado el año y la cobertura de nieve, no se aprecia ninguna tendencia de la nieve a lo largo de los años.
+
+Por lo tanto, vamos a probar con un histograma que será más adecuado para este caso:
+
+```{r}
+ggplot(ex2, aes(x=year,y=snow.cover)) + geom_histogram(stat="identity",color="black",fill="lightblue")+scale_x_discrete(limits=ex2$year)+ labs(title="Snow cover vs Year", y="Snow cover (millions of squared Km)") 
+```
+
+
+Con este gráfico descubrimos que en el año 1976 hubo mucha más nieve en comparación con los demás años de la década.
+
+
+\ 
+
+Centrándonos ahora únicamente en los valores de la cobertura de nieve:
+
+```{r}
+ggplot(ex2, aes(x=snow.cover)) + geom_histogram(binwidth = 4,color="black",fill="lightblue") + labs(x="Snow cover (millions of squared Km)", y="Number of years",title="Snow cover")
+```
+
+Con esta gráfica sabemos que ha habido 4 años en los que la cobertura estuvo por debajo de 10 millones de kilómetros cuadrados, 3 años entre 10 y 14, 2 años entre 14 y 18 y finalmente un único año que hubo entre 18 y 22. Interpretando su distribución sabemos que han ido siendo menos comunes aquellos años con una cobertura de nieve más elevada.
+
+
+#Ejercicio 3
+
+Primero cargamos el dataset
+
+```{r}
+NY <- read.csv("~/Descargas/NY.csv")
+```
+
+Ahora vamos a realizar la conversión de Fº a Cº y de "in" a "mm"
+
+```{r}
+NY[,2:8] <- (as.numeric(unlist(NY[,2:8]))-32)*5/9
+NY[,9:12] <- as.numeric(unlist(NY[,9:12]))*25.4
+```
+
+A continuación vamos a comparar el año frente a la temperatura mínima más cálida
+
+
+```{r}
+ggplot(NY, aes(x=Year,y=Warmest.Minimum.Temperature..F.,fill=..y..)) + geom_histogram(stat="identity",color="black")+scale_fill_gradient(low='blue', high='orange')+ labs(title="Warmest Minimum Temperature vs Year", y="Warmest Minimum Temperature Cº") 
+```
+
+\ 
+
+Podemos también visualizarlo de una forma más continua en el eje X.
+
+```{r}
+ggplot(NY, aes(x=Year, y = Warmest.Minimum.Temperature..F.)) + geom_area(col="blue",fill="lightgreen")+ labs(title="Warmest Minimum Temperature vs Year", y="Warmest Minimum Temperature Cº")
+```
+
+
+
+Una de las características que más destaca de estos dos gráficos es que varias veces sucede que después de un mínimo relativo aparece un máximo relativo, lo que se traduce en que después de un año con unas temperaturas mínimas muy bajas, sucedía un año de temperaturas mínimas muy altas; un hecho curioso de estudiar.
+
+
+\ 
+
+Por último vamos a observar las temperaturas mínimas más altas y más bajas a lo largo de los años
+
+
+```{r}
+ggplot(NY, aes(x=Year)) + geom_line(aes(y=Warmest.Minimum.Temperature..F.,colour="Warmest")) + geom_line(aes(y=Coldest.Minimum.Temperature..F.,colour="Coldest")) + scale_colour_manual("",breaks=c("Warmest","Coldest"),values=c("blue","red")) + labs(title="Minimum Temperature vs Year", y="Minimum temperature Cº")
+```
+
+
+
+Al observar las dos variables en la misma gráfica se detecta una relación directa entre ellas: Si un año aumentaba la temperatura mínima más calida, lo hacía también la temperatura mínima más fria. De igual forma sucedía si disminuía la temperatura mínima más cálida, que también lo hacía la más fria.
+
+
+
